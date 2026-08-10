@@ -2,25 +2,33 @@
 
 A small local webapp that suggests nearby beaches with calmer water, based on
 live wind/wave conditions, plus toddler-friendliness, beach bar availability
-and typical crowd level.
+and typical crowd level. Works anywhere in Greece, not just the pre-curated
+Chalkidiki beaches.
 
 ## How it works
 
 - You share a location (GPS "Use my location", or search any place name).
-- The app pulls the curated beach list from `beaches.json`, keeps the ones
-  within your chosen radius, and fetches **live** wind (and where available,
-  wave height) for each beach from [Open-Meteo](https://open-meteo.com/)
-  (free, no API key required).
-- Each beach has a stored "facing direction" (which way it opens to the sea)
-  and a "shelter arc". The app compares that to the live wind direction to
-  estimate whether the beach is exposed or sheltered right now, and combines
-  that with wave height, distance, crowd level, and your toddler/beach-bar
-  requirements into a ranked list.
+- The app combines two beach sources within your chosen radius:
+  - **Curated** (`beaches.json`): hand-verified Chalkidiki beaches with real
+    toddler-friendliness/bar/crowd notes and an authored "facing direction" +
+    "shelter arc" used to judge whether a beach is exposed to or sheltered
+    from the live wind direction.
+  - **OpenStreetMap** (via the free [Overpass API](https://overpass-api.de/)):
+    any other mapped beach in range, anywhere in Greece. Beach-bar presence
+    is inferred from real nearby bars/cafes/restaurants/toilets; toddler-
+    friendliness comes from OSM's `surface` tag when present, else shown as
+    "unknown - verify locally" (same for crowd level, which OSM has no
+    signal for at all). These are dedup'd against the curated list and
+    badged "🗺️ Community-mapped (OSM)" so it's clear which is which.
+- For every candidate it fetches **live** wind (and where available, wave
+  height) from [Open-Meteo](https://open-meteo.com/) (free, no API key
+  required) and scores/ranks by calmness, distance, and your filters.
 
-This is a heuristic, not a survey — the beach orientations, bar/crowd info
-etc. are curated from general knowledge and approximate coordinates. Edit
-`beaches.json` any time to correct details or add more beaches (it's a plain
-JSON list, one object per beach).
+This is a heuristic, not a survey — the curated beach orientations/bar/crowd
+info are hand-verified against Wikipedia/Wikidata but still worth a sanity
+check, and OSM-sourced fields are explicitly unverified. Edit `beaches.json`
+any time to correct details or add more curated beaches (it's a plain JSON
+list, one object per beach).
 
 ## Running it
 

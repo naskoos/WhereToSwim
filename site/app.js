@@ -1,6 +1,15 @@
 const GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
 const MARINE_URL = "https://marine-api.open-meteo.com/v1/marine";
+const OVERPASS_URLS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+];
+const OSM_DEDUPE_KM = 0.3;
+const OSM_AMENITY_RADIUS_KM = 0.4;
+const OSM_MAX_RADIUS_KM = 40;
+const SAND_SURFACES = ["sand", "fine_sand", "sandy"];
+const ROUGH_SURFACES = ["pebblestone", "pebbles", "shingle", "rock", "rocks", "gravel", "stone"];
 
 const COMPASS_POINTS = [
   "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
@@ -175,13 +184,107 @@ async function fetchWaves(beaches) {
   }
 }
 
+function osmElementLatLon(el) {
+  if (el.lat !== undefined && el.lon !== undefined) return { lat: el.lat, lon: el.lon };
+  if (el.center) return { lat: el.center.lat, lon: el.center.lon };
+  return null;
+}
+
+async function overpassFetch(query) {
+  for (const url of OVERPASS_URLS) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: "data=" + encodeURIComponent(query),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (!resp.ok) continue;
+      return await resp.json();
+    } catch (e) {
+      // try next mirror
+    }
+  }
+  return null;
+}
+
+async function fetchOsmBeaches(lat, lon, radiusKm, curatedBeaches) {
+  const r = Math.min(radiusKm, OSM_MAX_RADIUS_KM);
+  const radiusM = Math.round(r * 1000);
+  const query = `[out:json][timeout:25];(nwr["natural"="beach"](around:${radiusM},${lat},${lon});nwr["leisure"="beach_resort"](around:${radiusM},${lat},${lon});nwr["amenity"~"^(bar|cafe|restaurant)$"](around:${radiusM},${lat},${lon});nwr["amenity"="toilets"](around:${radiusM},${lat},${lon}););out center tags;`;
+
+  const data = await overpassFetch(query);
+  if (!data || !Array.isArray(data.elements)) return [];
+
+  const rawBeaches = [];
+  const amenities = [];
+  for (const el of data.elements) {
+    const pos = osmElementLatLon(el);
+    if (!pos) continue;
+    const tags = el.tags || {};
+    if (tags.natural === "beach" || tags.leisure === "beach_resort") {
+      rawBeaches.push({ id: `osm_${el.type}_${el.id}`, lat: pos.lat, lon: pos.lon, tags });
+    } else if (tags.amenity === "toilets") {
+      amenities.push({ lat: pos.lat, lon: pos.lon, isToilet: true });
+    } else if (["bar", "cafe", "restaurant"].includes(tags.amenity)) {
+      amenities.push({ lat: pos.lat, lon: pos.lon, isToilet: false });
+    }
+  }
+
+  const results = [];
+  for (const rb of rawBeaches) {
+    const tooCloseToCurated = curatedBeaches.some(
+      (c) => haversineKm(rb.lat, rb.lon, c.lat, c.lon) < OSM_DEDUPE_KM
+    );
+    if (tooCloseToCurated) continue;
+    if (results.some((r2) => haversineKm(rb.lat, rb.lon, r2.lat, r2.lon) < OSM_DEDUPE_KM)) continue;
+
+    const nearby = amenities.filter((a) => haversineKm(rb.lat, rb.lon, a.lat, a.lon) <= OSM_AMENITY_RADIUS_KM);
+    const barCount = nearby.filter((a) => !a.isToilet).length;
+    const hasToilet = nearby.some((a) => a.isToilet);
+    const hasBeachBar = barCount > 0 || hasToilet;
+
+    const surface = (rb.tags.surface || "").toLowerCase();
+    let toddlerFriendly = null;
+    if (SAND_SURFACES.includes(surface)) toddlerFriendly = true;
+    else if (ROUGH_SURFACES.includes(surface)) toddlerFriendly = false;
+
+    const name = rb.tags.name || rb.tags["name:en"] || "Unnamed beach";
+
+    results.push({
+      id: rb.id,
+      name,
+      area: "OpenStreetMap",
+      lat: rb.lat,
+      lon: rb.lon,
+      facing_deg: null,
+      shelter_arc_deg: null,
+      toddler_friendly: toddlerFriendly,
+      toddler_notes: surface
+        ? `OpenStreetMap lists the surface as "${surface}".`
+        : "Surface and water depth aren't recorded on OpenStreetMap - check before bringing a toddler.",
+      has_beach_bar: hasBeachBar,
+      bar_notes: hasBeachBar
+        ? `${barCount > 0 ? `${barCount} bar/cafe/restaurant` : "A public toilet"} found within ${Math.round(OSM_AMENITY_RADIUS_KM * 1000)}m on OpenStreetMap.`
+        : "No bar/cafe/restaurant/toilet found nearby on OpenStreetMap (may just be unmapped).",
+      crowd_level: null,
+      notes: "Discovered via OpenStreetMap, not independently verified - double-check conditions and amenities in person.",
+      source: "osm",
+    });
+  }
+  return results;
+}
+
 function scoreBeach(beach, distanceKm, wind, waveHeight, wantToddler, wantBar, maxWave, maxBeaufort) {
   const windSpeed = wind ? wind.speed : null;
   const windDir = wind ? wind.dir : null;
   const beaufort = kmhToBeaufort(windSpeed);
 
   let exposed = null;
-  if (windDir !== null && windDir !== undefined) {
+  if (windDir !== null && windDir !== undefined && beach.facing_deg !== null && beach.facing_deg !== undefined) {
     const diff = circularDiff(windDir, beach.facing_deg);
     exposed = diff <= beach.shelter_arc_deg / 2;
   }
@@ -205,7 +308,7 @@ function scoreBeach(beach, distanceKm, wind, waveHeight, wantToddler, wantBar, m
   const comfortUnknown = (waveHeight === null || waveHeight === undefined) && (beaufort === null || beaufort === undefined);
 
   let score = calmness;
-  score += beach.toddler_friendly ? 10 : wantToddler ? -25 : 0;
+  score += beach.toddler_friendly === true ? 10 : beach.toddler_friendly === false && wantToddler ? -25 : 0;
   score += beach.has_beach_bar ? 10 : wantBar ? -25 : 0;
   score -= CROWD_PENALTY[beach.crowd_level] ?? 5;
   score -= distanceKm * 0.3;
@@ -217,15 +320,19 @@ function scoreBeach(beach, distanceKm, wind, waveHeight, wantToddler, wantBar, m
   }
   if (windSpeed !== null && windSpeed !== undefined) {
     const compass = degToCompass(windDir) || "";
-    const state = exposed ? "exposed to" : "sheltered from";
-    reasons.push(
-      `${state} the current ${compass} wind: Bft ${beaufort} (${beaufortLabel(beaufort)}, ${windSpeed.toFixed(0)} km/h)${passesWind ? "" : ` (over your Bft ${maxBeaufort} limit)`}`.replace("  ", " ")
-    );
+    let windPhrase;
+    if (exposed === true) windPhrase = `exposed to the current ${compass} wind`;
+    else if (exposed === false) windPhrase = `sheltered from the current ${compass} wind`;
+    else windPhrase = `current ${compass} wind (shelter unknown)`;
+    const over = passesWind ? "" : ` (over your Bft ${maxBeaufort} limit)`;
+    reasons.push(`${windPhrase}: Bft ${beaufort} (${beaufortLabel(beaufort)}, ${windSpeed.toFixed(0)} km/h)${over}`.replace("  ", " "));
   }
-  if (beach.toddler_friendly) reasons.push("toddler-friendly (shallow/gentle entry)");
+  if (beach.toddler_friendly === true) reasons.push("toddler-friendly (shallow/gentle entry)");
+  else if (beach.toddler_friendly === null) reasons.push("toddler-friendliness unknown - verify locally");
   if (beach.has_beach_bar) reasons.push("has a beach bar/taverna");
-  reasons.push(`${beach.crowd_level} crowd level`);
+  reasons.push(beach.crowd_level ? `${beach.crowd_level} crowd level` : "crowd level unknown");
   reasons.push(`${distanceKm.toFixed(0)} km away`);
+  if (beach.source === "osm") reasons.push("found via OpenStreetMap - not independently verified");
 
   return {
     id: beach.id,
@@ -248,6 +355,7 @@ function scoreBeach(beach, distanceKm, wind, waveHeight, wantToddler, wantBar, m
     bar_notes: beach.bar_notes,
     crowd_level: beach.crowd_level,
     notes: beach.notes,
+    source: beach.source || "curated",
     maps_url: `https://www.google.com/maps/dir/?api=1&destination=${beach.lat},${beach.lon}`,
     reasons,
   };
@@ -282,11 +390,24 @@ function renderResults(results, relaxedFilters) {
     else if (beach.calmness >= 65) calmBadge = badge("Calm", "good");
     else calmBadge = badge("Within your limit", "warn");
 
+    let toddlerBadge;
+    if (beach.toddler_friendly === true) toddlerBadge = badge("Toddler-friendly", "good");
+    else if (beach.toddler_friendly === false) toddlerBadge = badge("Not ideal for toddlers", "bad");
+    else toddlerBadge = badge("Toddler-friendliness unknown", "warn");
+
+    const crowdBadge = beach.crowd_level
+      ? badge(`${beach.crowd_level} crowd`, beach.crowd_level === "low" ? "good" : beach.crowd_level === "medium" ? "warn" : "bad")
+      : badge("crowd level unknown", "warn");
+
+    const sourceBadge =
+      beach.source === "osm" ? badge("🗺️ Community-mapped (OSM)", "warn") : badge("📋 Curated", "good");
+
     const badges = [
       calmBadge,
-      beach.toddler_friendly ? badge("Toddler-friendly", "good") : badge("Not ideal for toddlers", "warn"),
+      toddlerBadge,
       beach.has_beach_bar ? badge("Beach bar/toilet", "good") : badge("No beach bar", "warn"),
-      badge(`${beach.crowd_level} crowd`, beach.crowd_level === "low" ? "good" : beach.crowd_level === "medium" ? "warn" : "bad"),
+      crowdBadge,
+      sourceBadge,
     ].join("");
 
     const conditions = [];
@@ -325,22 +446,32 @@ findBtn.addEventListener("click", async () => {
 
   findBtn.disabled = true;
   findBtn.textContent = "Searching...";
-  resultsEl.innerHTML = `<p class="status-msg">Checking live wind &amp; wave conditions...</p>`;
+  resultsEl.innerHTML = `<p class="status-msg">Looking for beaches nearby...</p>`;
 
   try {
     const allBeaches = await beachesPromise;
     const { lat, lon } = selectedLocation;
 
-    let candidates = allBeaches
+    let curatedCandidates = allBeaches
       .map((b) => ({ beach: b, distance: haversineKm(lat, lon, b.lat, b.lon) }))
       .filter((c) => c.distance <= radiusKm);
 
-    if (!candidates.length) {
-      candidates = allBeaches
+    if (!curatedCandidates.length) {
+      curatedCandidates = allBeaches
         .map((b) => ({ beach: b, distance: haversineKm(lat, lon, b.lat, b.lon) }))
         .sort((a, b) => a.distance - b.distance)
         .slice(0, 5);
     }
+
+    const osmBeaches = await fetchOsmBeaches(lat, lon, radiusKm, allBeaches);
+    const osmCandidates = osmBeaches
+      .map((b) => ({ beach: b, distance: haversineKm(lat, lon, b.lat, b.lon) }))
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 15);
+
+    const candidates = [...curatedCandidates, ...osmCandidates];
+
+    resultsEl.innerHTML = `<p class="status-msg">Checking live wind &amp; wave conditions for ${candidates.length} beaches...</p>`;
 
     const beachList = candidates.map((c) => c.beach);
     const [windById, waveById] = await Promise.all([fetchWind(beachList), fetchWaves(beachList)]);
@@ -350,7 +481,7 @@ findBtn.addEventListener("click", async () => {
     );
 
     const strict = scored.filter(
-      (s) => (!wantToddler || s.toddler_friendly) && (!wantBar || s.has_beach_bar) && s.passes_comfort
+      (s) => (!wantToddler || s.toddler_friendly !== false) && (!wantBar || s.has_beach_bar) && s.passes_comfort
     );
     const relaxedFilters = strict.length < 3;
     const pool = relaxedFilters ? scored : strict;

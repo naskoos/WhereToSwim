@@ -99,11 +99,24 @@ function renderResults(data) {
     else if (beach.calmness >= 65) calmBadge = badge("Calm", "good");
     else calmBadge = badge("Within your limit", "warn");
 
+    let toddlerBadge;
+    if (beach.toddler_friendly === true) toddlerBadge = badge("Toddler-friendly", "good");
+    else if (beach.toddler_friendly === false) toddlerBadge = badge("Not ideal for toddlers", "bad");
+    else toddlerBadge = badge("Toddler-friendliness unknown", "warn");
+
+    const crowdBadge = beach.crowd_level
+      ? badge(`${beach.crowd_level} crowd`, beach.crowd_level === "low" ? "good" : beach.crowd_level === "medium" ? "warn" : "bad")
+      : badge("crowd level unknown", "warn");
+
+    const sourceBadge =
+      beach.source === "osm" ? badge("🗺️ Community-mapped (OSM)", "warn") : badge("📋 Curated", "good");
+
     const badges = [
       calmBadge,
-      beach.toddler_friendly ? badge("Toddler-friendly", "good") : badge("Not ideal for toddlers", "warn"),
+      toddlerBadge,
       beach.has_beach_bar ? badge("Beach bar/toilet", "good") : badge("No beach bar", "warn"),
-      badge(`${beach.crowd_level} crowd`, beach.crowd_level === "low" ? "good" : beach.crowd_level === "medium" ? "warn" : "bad"),
+      crowdBadge,
+      sourceBadge,
     ].join("");
 
     const conditions = [];
@@ -119,7 +132,7 @@ function renderResults(data) {
         <h3>${idx + 1}. ${beach.name}</h3>
         <span>${beach.distance_km} km</span>
       </div>
-      <p class="beach-area">${beach.area} &middot; ${conditions.join(" &middot; ")}</p>
+      <p class="beach-area">${beach.area}${conditions.length ? " &middot; " + conditions.join(" &middot; ") : ""}</p>
       <div class="badges">${badges}</div>
       <ul class="reasons">${beach.reasons.map((r) => `<li>${r}</li>`).join("")}</ul>
       <p class="beach-notes">${beach.notes}<br/>${beach.toddler_notes} ${beach.bar_notes}</p>

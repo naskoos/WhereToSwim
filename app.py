@@ -11,7 +11,17 @@ BEACHES_PATH = os.path.join(os.path.dirname(__file__), "beaches.json")
 GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search"
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 MARINE_URL = "https://marine-api.open-meteo.com/v1/marine"
+OVERPASS_URLS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+]
 HTTP_TIMEOUT = 8
+OVERPASS_TIMEOUT = 15
+OSM_DEDUPE_KM = 0.3
+OSM_AMENITY_RADIUS_KM = 0.4
+OSM_MAX_RADIUS_KM = 40
+SAND_SURFACES = {"sand", "fine_sand", "sandy"}
+ROUGH_SURFACES = {"pebblestone", "pebbles", "shingle", "rock", "rocks", "gravel", "stone"}
 
 COMPASS_POINTS = [
     "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
@@ -136,16 +146,114 @@ def fetch_waves(beaches):
     return result
 
 
+def overpass_fetch(query):
+    for url in OVERPASS_URLS:
+        try:
+            resp = requests.post(url, data={"data": query}, timeout=OVERPASS_TIMEOUT)
+            resp.raise_for_status()
+            return resp.json()
+        except requests.RequestException:
+            continue
+    return None
+
+
+def osm_element_latlon(el):
+    if "lat" in el and "lon" in el:
+        return el["lat"], el["lon"]
+    center = el.get("center")
+    if center:
+        return center["lat"], center["lon"]
+    return None
+
+
+def fetch_osm_beaches(lat, lon, radius_km, curated_beaches):
+    r = min(radius_km, OSM_MAX_RADIUS_KM)
+    radius_m = round(r * 1000)
+    query = (
+        f'[out:json][timeout:25];'
+        f'(nwr["natural"="beach"](around:{radius_m},{lat},{lon});'
+        f'nwr["leisure"="beach_resort"](around:{radius_m},{lat},{lon});'
+        f'nwr["amenity"~"^(bar|cafe|restaurant)$"](around:{radius_m},{lat},{lon});'
+        f'nwr["amenity"="toilets"](around:{radius_m},{lat},{lon}););'
+        f'out center tags;'
+    )
+    data = overpass_fetch(query)
+    if not data or not isinstance(data.get("elements"), list):
+        return []
+
+    raw_beaches = []
+    amenities = []
+    for el in data["elements"]:
+        pos = osm_element_latlon(el)
+        if not pos:
+            continue
+        tags = el.get("tags", {}) or {}
+        if tags.get("natural") == "beach" or tags.get("leisure") == "beach_resort":
+            raw_beaches.append({"id": f"osm_{el['type']}_{el['id']}", "lat": pos[0], "lon": pos[1], "tags": tags})
+        elif tags.get("amenity") == "toilets":
+            amenities.append({"lat": pos[0], "lon": pos[1], "is_toilet": True})
+        elif tags.get("amenity") in ("bar", "cafe", "restaurant"):
+            amenities.append({"lat": pos[0], "lon": pos[1], "is_toilet": False})
+
+    results = []
+    for rb in raw_beaches:
+        if any(haversine_km(rb["lat"], rb["lon"], c["lat"], c["lon"]) < OSM_DEDUPE_KM for c in curated_beaches):
+            continue
+        if any(haversine_km(rb["lat"], rb["lon"], r2["lat"], r2["lon"]) < OSM_DEDUPE_KM for r2 in results):
+            continue
+
+        nearby = [a for a in amenities if haversine_km(rb["lat"], rb["lon"], a["lat"], a["lon"]) <= OSM_AMENITY_RADIUS_KM]
+        bar_count = sum(1 for a in nearby if not a["is_toilet"])
+        has_toilet = any(a["is_toilet"] for a in nearby)
+        has_beach_bar = bar_count > 0 or has_toilet
+
+        surface = (rb["tags"].get("surface") or "").lower()
+        toddler_friendly = None
+        if surface in SAND_SURFACES:
+            toddler_friendly = True
+        elif surface in ROUGH_SURFACES:
+            toddler_friendly = False
+
+        name = rb["tags"].get("name") or rb["tags"].get("name:en") or "Unnamed beach"
+
+        results.append({
+            "id": rb["id"],
+            "name": name,
+            "area": "OpenStreetMap",
+            "lat": rb["lat"],
+            "lon": rb["lon"],
+            "facing_deg": None,
+            "shelter_arc_deg": None,
+            "toddler_friendly": toddler_friendly,
+            "toddler_notes": (
+                f'OpenStreetMap lists the surface as "{surface}".'
+                if surface
+                else "Surface and water depth aren't recorded on OpenStreetMap - check before bringing a toddler."
+            ),
+            "has_beach_bar": has_beach_bar,
+            "bar_notes": (
+                f"{bar_count if bar_count > 0 else 'A public toilet'}"
+                f"{' bar/cafe/restaurant' if bar_count > 0 else ''} found within {int(OSM_AMENITY_RADIUS_KM * 1000)}m on OpenStreetMap."
+                if has_beach_bar
+                else "No bar/cafe/restaurant/toilet found nearby on OpenStreetMap (may just be unmapped)."
+            ),
+            "crowd_level": None,
+            "notes": "Discovered via OpenStreetMap, not independently verified - double-check conditions and amenities in person.",
+            "source": "osm",
+        })
+    return results
+
+
 def score_beach(beach, distance_km, wind_speed, wind_dir, wave_height, want_toddler, want_bar, max_wave, max_beaufort):
     exposed = None
-    if wind_dir is not None:
+    if wind_dir is not None and beach.get("facing_deg") is not None:
         diff = circular_diff(wind_dir, beach["facing_deg"])
         exposed = diff <= beach["shelter_arc_deg"] / 2
 
     beaufort = kmh_to_beaufort(wind_speed)
 
     if wave_height is not None:
-        chop = wave_height * (1.0 if exposed else 0.6)
+        chop = wave_height * (0.6 if exposed is False else 1.0)
         chop_source = "marine forecast"
     elif wind_speed is not None:
         base = wind_speed / 50.0
@@ -166,7 +274,7 @@ def score_beach(beach, distance_km, wind_speed, wind_dir, wave_height, want_todd
     comfort_unknown = wave_height is None and beaufort is None
 
     score = calmness
-    score += 10 if beach["toddler_friendly"] else -25 if want_toddler else 0
+    score += 10 if beach["toddler_friendly"] is True else -25 if beach["toddler_friendly"] is False and want_toddler else 0
     score += 10 if beach["has_beach_bar"] else -25 if want_bar else 0
     score -= CROWD_PENALTY.get(beach["crowd_level"], 5)
     score -= distance_km * 0.3
@@ -178,17 +286,26 @@ def score_beach(beach, distance_km, wind_speed, wind_dir, wave_height, want_todd
         reasons.append(f"~{wave_height:.1f} m waves expected right now{over}")
     if wind_speed is not None:
         compass = deg_to_compass(wind_dir)
-        state = "exposed to" if exposed else "sheltered from"
+        if exposed is True:
+            wind_phrase = f"exposed to the current {compass or ''} wind"
+        elif exposed is False:
+            wind_phrase = f"sheltered from the current {compass or ''} wind"
+        else:
+            wind_phrase = f"current {compass or ''} wind (shelter unknown)"
         over = "" if passes_wind else f" (over your Bft {max_beaufort} limit)"
         reasons.append(
-            f"{state} the current {compass or ''} wind: Bft {beaufort} ({beaufort_label(beaufort)}, {wind_speed:.0f} km/h){over}".replace("  ", " ")
+            f"{wind_phrase}: Bft {beaufort} ({beaufort_label(beaufort)}, {wind_speed:.0f} km/h){over}".replace("  ", " ")
         )
-    if beach["toddler_friendly"]:
+    if beach["toddler_friendly"] is True:
         reasons.append("toddler-friendly (shallow/gentle entry)")
+    elif beach["toddler_friendly"] is None:
+        reasons.append("toddler-friendliness unknown - verify locally")
     if beach["has_beach_bar"]:
         reasons.append("has a beach bar/taverna")
-    reasons.append(f"{beach['crowd_level']} crowd level")
+    reasons.append(f"{beach['crowd_level']} crowd level" if beach["crowd_level"] else "crowd level unknown")
     reasons.append(f"{distance_km:.0f} km away")
+    if beach.get("source") == "osm":
+        reasons.append("found via OpenStreetMap - not independently verified")
 
     return {
         "id": beach["id"],
@@ -213,6 +330,7 @@ def score_beach(beach, distance_km, wind_speed, wind_dir, wave_height, want_todd
         "bar_notes": beach["bar_notes"],
         "crowd_level": beach["crowd_level"],
         "notes": beach["notes"],
+        "source": beach.get("source", "curated"),
         "maps_url": f"https://www.google.com/maps/dir/?api=1&destination={beach['lat']},{beach['lon']}",
         "reasons": reasons,
     }
@@ -279,6 +397,13 @@ def api_recommend():
             key=lambda t: t[1],
         )[:5]
 
+    osm_beaches = fetch_osm_beaches(lat, lon, radius_km, beaches)
+    osm_candidates = sorted(
+        ((b, haversine_km(lat, lon, b["lat"], b["lon"])) for b in osm_beaches),
+        key=lambda t: t[1],
+    )[:15]
+    candidates = candidates + osm_candidates
+
     beach_list = [b for b, _ in candidates]
     wind_by_id = fetch_wind(beach_list)
     wave_by_id = fetch_waves(beach_list)
@@ -291,7 +416,7 @@ def api_recommend():
 
     strict = [
         s for s in scored
-        if (not want_toddler or s["toddler_friendly"]) and (not want_bar or s["has_beach_bar"]) and s["passes_comfort"]
+        if (not want_toddler or s["toddler_friendly"] is not False) and (not want_bar or s["has_beach_bar"]) and s["passes_comfort"]
     ]
     pool = strict if len(strict) >= 3 else scored
     pool.sort(key=lambda s: s["score"], reverse=True)
