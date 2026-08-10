@@ -13,6 +13,9 @@ on:
           - mainland-only
           - islands-only
 
+permissions:
+  contents: write
+
 jobs:
   import:
     runs-on: ubuntu-latest
@@ -32,3 +35,11 @@ jobs:
           name: osm-bulk-beaches-${{ inputs.scope }}
           path: osm_bulk_beaches.json
           retention-days: 7
+      - name: Commit result to review branch
+        run: |
+          git config user.name "osm-import-bot"
+          git config user.email "actions@github.com"
+          git checkout -B osm-bulk-review
+          git add -f osm_bulk_beaches.json
+          git commit -m "OSM bulk import result (scope=${{ inputs.scope }}, run ${{ github.run_id }})" || echo "nothing to commit"
+          git push -f origin osm-bulk-review
