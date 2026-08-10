@@ -2,6 +2,16 @@ name: Import OSM Beaches (manual)
 
 on:
   workflow_dispatch:
+    inputs:
+      scope:
+        description: "Which regions to query"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - all
+          - mainland-only
+          - islands-only
 
 jobs:
   import:
@@ -12,9 +22,13 @@ jobs:
         with:
           python-version: "3.11"
       - name: Run bulk OSM beach import
-        run: python scripts/import_osm_beaches.py
+        run: |
+          FLAG=""
+          if [ "${{ inputs.scope }}" = "mainland-only" ]; then FLAG="--mainland-only"; fi
+          if [ "${{ inputs.scope }}" = "islands-only" ]; then FLAG="--islands-only"; fi
+          python scripts/import_osm_beaches.py $FLAG
       - uses: actions/upload-artifact@v4
         with:
-          name: osm-bulk-beaches
+          name: osm-bulk-beaches-${{ inputs.scope }}
           path: osm_bulk_beaches.json
           retention-days: 7

@@ -1,6 +1,6 @@
 """
 Bulk-import candidate beaches from OpenStreetMap (Overpass API) for the
-mainland Greek coastline, excluding islands.
+whole Greek coastline, mainland and islands.
 
 Runs on GitHub Actions (this sandbox's outbound network can't reach
 Overpass directly). Writes candidate entries to osm_bulk_beaches.json
@@ -9,6 +9,7 @@ directly, so a human can sanity-check the results before merging.
 """
 import json
 import math
+import sys
 import time
 import urllib.error
 import urllib.parse
@@ -20,8 +21,7 @@ OVERPASS_URLS = [
 ]
 
 # Rough bounding boxes (south, west, north, east) covering mainland
-# Greek coastal regions. Intentionally generous - island exclusion
-# boxes below catch anything that spills into island territory.
+# Greek coastal regions.
 MAINLAND_REGIONS = {
     "Evros": (40.75, 25.7, 41.0, 26.35),
     "Rodopi-Xanthi": (40.75, 24.75, 41.05, 25.35),
@@ -38,23 +38,27 @@ MAINLAND_REGIONS = {
     "Elis-Achaea": (37.6, 21.1, 38.3, 21.9),
 }
 
-# Boxes covering nearby islands, to filter out anything OSM returns
-# that falls inside them even though a mainland region box overlaps
-# the area (straits, narrow channels, etc).
-ISLAND_EXCLUSION_BOXES = [
-    ("Corfu", (39.35, 19.65, 39.82, 20.15)),
-    ("Paxoi", (39.1, 20.1, 39.25, 20.28)),
-    ("Lefkada", (38.55, 20.5, 38.85, 20.78)),
-    ("Kefalonia-Ithaca", (38.05, 20.4, 38.55, 20.85)),
-    ("Zakynthos", (37.65, 20.7, 37.95, 21.0)),
-    ("Kythira-Antikythira", (35.75, 22.95, 36.4, 23.15)),
-    ("Elafonisos", (36.42, 22.92, 36.52, 23.08)),
-    ("Evia", (37.95, 23.0, 39.05, 24.25)),
-    ("Sporades", (39.0, 23.4, 39.35, 24.1)),
-    ("Saronic islands", (37.15, 23.15, 38.05, 23.65)),
-    ("Thassos", (40.6, 24.55, 40.82, 24.85)),
-    ("Samothraki", (40.38, 25.4, 40.6, 25.65)),
-]
+# Bounding boxes covering the main Greek island groups.
+ISLAND_REGIONS = {
+    "Corfu": (39.35, 19.65, 39.82, 20.15),
+    "Paxoi": (39.1, 20.1, 39.25, 20.28),
+    "Lefkada": (38.55, 20.5, 38.85, 20.78),
+    "Kefalonia-Ithaca": (38.05, 20.4, 38.55, 20.85),
+    "Zakynthos": (37.65, 20.7, 37.95, 21.0),
+    "Kythira-Antikythira": (35.75, 22.95, 36.4, 23.15),
+    "Evia": (37.95, 23.0, 39.05, 24.25),
+    "Sporades": (39.0, 23.3, 39.6, 24.7),
+    "Saronic islands": (37.1, 23.1, 38.05, 23.65),
+    "Thassos": (40.6, 24.55, 40.82, 24.85),
+    "Samothraki": (40.38, 25.4, 40.6, 25.65),
+    "Crete": (34.75, 23.4, 35.75, 26.35),
+    "Cyclades": (36.35, 24.15, 37.9, 26.4),
+    "Dodecanese": (35.1, 26.1, 37.0, 29.8),
+    "NE Aegean (Lesvos-Chios-Samos-Ikaria)": (37.5, 25.3, 39.5, 27.3),
+}
+
+ALL_REGIONS = {**MAINLAND_REGIONS, **ISLAND_REGIONS}
+ISLAND_REGION_NAMES = set(ISLAND_REGIONS.keys())
 
 AMENITY_RADIUS_KM = 0.4
 DEDUPE_KM = 0.4
@@ -68,18 +72,6 @@ def haversine_km(lat1, lon1, lat2, lon2):
     dlambda = math.radians(lon2 - lon1)
     a = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dlambda / 2) ** 2
     return 2 * r * math.asin(math.sqrt(a))
-
-
-def in_box(lat, lon, box):
-    s, w, n, e = box
-    return s <= lat <= n and w <= lon <= e
-
-
-def is_in_any_island_box(lat, lon):
-    for name, box in ISLAND_EXCLUSION_BOXES:
-        if in_box(lat, lon, box):
-            return name
-    return None
 
 
 def overpass_query(bbox):
@@ -121,11 +113,20 @@ def element_latlon(el):
 
 
 def main():
+    only_islands = "--islands-only" in sys.argv
+    only_mainland = "--mainland-only" in sys.argv
+    if only_islands:
+        regions = ISLAND_REGIONS
+    elif only_mainland:
+        regions = MAINLAND_REGIONS
+    else:
+        regions = ALL_REGIONS
+
     with open("beaches.json", encoding="utf-8") as f:
         curated = json.load(f)
 
     all_candidates = []
-    for region_name, bbox in MAINLAND_REGIONS.items():
+    for region_name, bbox in regions.items():
         print(f"Querying {region_name} {bbox} ...")
         data = fetch_overpass(overpass_query(bbox))
         if not data or not isinstance(data.get("elements"), list):
@@ -146,14 +147,8 @@ def main():
             elif tags.get("amenity") in ("bar", "cafe", "restaurant"):
                 amenities.append({"lat": pos[0], "lon": pos[1], "is_toilet": False})
 
-        kept = 0
-        excluded_island = 0
+        is_island = region_name in ISLAND_REGION_NAMES
         for rb in raw_beaches:
-            island = is_in_any_island_box(rb["lat"], rb["lon"])
-            if island:
-                excluded_island += 1
-                continue
-
             surface = (rb["tags"].get("surface") or "").lower()
             name = rb["tags"].get("name") or rb["tags"].get("name:en") or f"Unnamed beach ({region_name})"
 
@@ -166,14 +161,14 @@ def main():
                 "osm_id": rb["id"],
                 "name": name,
                 "region": region_name,
+                "is_island": is_island,
                 "lat": round(rb["lat"], 5),
                 "lon": round(rb["lon"], 5),
                 "surface": surface or None,
                 "bar_count_nearby": bar_count,
                 "has_toilet_nearby": has_toilet,
             })
-            kept += 1
-        print(f"  {len(raw_beaches)} raw, {excluded_island} excluded as island, {kept} kept")
+        print(f"  {len(raw_beaches)} beach points kept")
         time.sleep(2)  # be polite to the free API between region queries
 
     # Dedupe against each other (keep first / prefer named)
@@ -199,11 +194,12 @@ def main():
     print(f"After self-dedup: {len(deduped)}")
     print(f"After dedup against {len(curated)} curated beaches: {len(final)}")
 
-    with open("osm_bulk_beaches.json", "w", encoding="utf-8") as f:
+    out_path = "osm_bulk_beaches.json"
+    with open(out_path, "w", encoding="utf-8") as f:
         json.dump(final, f, indent=2, ensure_ascii=False)
         f.write("\n")
 
-    print(f"Wrote osm_bulk_beaches.json with {len(final)} candidates")
+    print(f"Wrote {out_path} with {len(final)} candidates")
 
 
 if __name__ == "__main__":
