@@ -16,9 +16,11 @@ import urllib.parse
 import urllib.request
 
 OVERPASS_URLS = [
-    "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass-api.de/api/interpreter",
 ]
+
+USER_AGENT = "WhereToSwim-beach-finder/1.0 (personal hobby project; github.com/naskoos/WhereToSwim)"
 
 # Rough bounding boxes (south, west, north, east) covering mainland
 # Greek coastal regions.
@@ -88,17 +90,23 @@ def overpass_query(bbox):
     )
 
 
-def fetch_overpass(query, attempt=0):
+def fetch_overpass(query):
     body = ("data=" + urllib.parse.quote(query)).encode("utf-8")
     for url in OVERPASS_URLS:
         try:
             req = urllib.request.Request(
-                url, data=body, headers={"Content-Type": "application/x-www-form-urlencoded"}
+                url,
+                data=body,
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "User-Agent": USER_AGENT,
+                    "Accept": "*/*",
+                },
             )
-            with urllib.request.urlopen(req, timeout=120) as resp:
+            with urllib.request.urlopen(req, timeout=60) as resp:
                 return json.loads(resp.read().decode("utf-8"))
         except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError) as e:
-            print(f"  overpass request failed on {url}: {e}")
+            print(f"  overpass request failed on {url}: {e}", flush=True)
             continue
     return None
 
@@ -127,10 +135,10 @@ def main():
 
     all_candidates = []
     for region_name, bbox in regions.items():
-        print(f"Querying {region_name} {bbox} ...")
+        print(f"Querying {region_name} {bbox} ...", flush=True)
         data = fetch_overpass(overpass_query(bbox))
         if not data or not isinstance(data.get("elements"), list):
-            print(f"  no data for {region_name}, skipping")
+            print(f"  no data for {region_name}, skipping", flush=True)
             continue
 
         raw_beaches = []
@@ -168,7 +176,7 @@ def main():
                 "bar_count_nearby": bar_count,
                 "has_toilet_nearby": has_toilet,
             })
-        print(f"  {len(raw_beaches)} beach points kept")
+        print(f"  {len(raw_beaches)} beach points kept", flush=True)
         time.sleep(2)  # be polite to the free API between region queries
 
     # Dedupe against each other (keep first / prefer named)
