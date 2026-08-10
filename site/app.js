@@ -44,9 +44,18 @@ const placeResults = document.getElementById("place-results");
 const findBtn = document.getElementById("find-btn");
 const resultsEl = document.getElementById("results");
 
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
 function setLocation(lat, lon, label) {
   selectedLocation = { lat, lon, label };
-  locationStatus.textContent = label ? `Using: ${label}` : `Using: ${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+  const coords = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+  const mapsUrl = `https://www.google.com/maps?q=${lat},${lon}`;
+  const labelHtml = label ? `${escapeHtml(label)} &mdash; ` : "";
+  locationStatus.innerHTML = `${labelHtml}${coords} <a href="${mapsUrl}" target="_blank" rel="noopener">check on map</a>`;
 }
 
 document.getElementById("use-location-btn").addEventListener("click", () => {

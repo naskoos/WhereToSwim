@@ -64,6 +64,11 @@ main {
   font-size: 0.9rem;
 }
 
+#location-status a {
+  color: var(--sea-dark);
+  font-weight: 600;
+}
+
 .search-row {
   position: relative;
   margin-bottom: 14px;
