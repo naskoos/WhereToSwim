@@ -12,6 +12,12 @@ on:
           - all
           - mainland-only
           - islands-only
+          - only
+      only_regions:
+        description: "Comma-separated region names (used when scope=only)"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: write
@@ -29,7 +35,8 @@ jobs:
           FLAG=""
           if [ "${{ inputs.scope }}" = "mainland-only" ]; then FLAG="--mainland-only"; fi
           if [ "${{ inputs.scope }}" = "islands-only" ]; then FLAG="--islands-only"; fi
-          python -u scripts/import_osm_beaches.py $FLAG
+          if [ "${{ inputs.scope }}" = "only" ]; then FLAG="--only=${{ inputs.only_regions }}"; fi
+          python -u scripts/import_osm_beaches.py "$FLAG"
       - uses: actions/upload-artifact@v4
         with:
           name: osm-bulk-beaches-${{ inputs.scope }}

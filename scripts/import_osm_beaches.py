@@ -55,8 +55,10 @@ ISLAND_REGIONS = {
     "Samothraki": (40.38, 25.4, 40.6, 25.65),
     "Crete": (34.75, 23.4, 35.75, 26.35),
     "Cyclades": (36.35, 24.15, 37.9, 26.4),
-    "Dodecanese": (35.1, 26.1, 37.0, 29.8),
-    "NE Aegean (Lesvos-Chios-Samos-Ikaria)": (37.5, 25.3, 39.5, 27.3),
+    "Dodecanese-North (Kos-Kalymnos-Leros-Patmos)": (35.85, 26.1, 37.0, 27.6),
+    "Dodecanese-South (Rhodes-Karpathos)": (35.1, 27.0, 36.6, 28.5),
+    "NE Aegean-North (Lesvos-Chios)": (38.0, 25.6, 39.5, 26.6),
+    "NE Aegean-South (Samos-Ikaria)": (37.5, 26.0, 38.0, 27.3),
 }
 
 ALL_REGIONS = {**MAINLAND_REGIONS, **ISLAND_REGIONS}
@@ -123,7 +125,15 @@ def element_latlon(el):
 def main():
     only_islands = "--islands-only" in sys.argv
     only_mainland = "--mainland-only" in sys.argv
-    if only_islands:
+    only_arg = next((a for a in sys.argv if a.startswith("--only=")), None)
+
+    if only_arg:
+        names = [n.strip() for n in only_arg[len("--only="):].split(",") if n.strip()]
+        regions = {n: ALL_REGIONS[n] for n in names if n in ALL_REGIONS}
+        missing = [n for n in names if n not in ALL_REGIONS]
+        if missing:
+            print(f"Warning: unknown region names ignored: {missing}", flush=True)
+    elif only_islands:
         regions = ISLAND_REGIONS
     elif only_mainland:
         regions = MAINLAND_REGIONS
