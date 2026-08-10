@@ -1,0 +1,20 @@
+name: Import OSM Beaches (manual)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run bulk OSM beach import
+        run: python scripts/import_osm_beaches.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: osm-bulk-beaches
+          path: osm_bulk_beaches.json
+          retention-days: 7
