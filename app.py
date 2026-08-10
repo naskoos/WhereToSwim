@@ -20,6 +20,38 @@ COMPASS_POINTS = [
 
 CROWD_PENALTY = {"low": 0, "medium": 8, "high": 18}
 
+BEAUFORT_SCALE = [
+    (1, 0, "Calm"),
+    (5, 1, "Light air"),
+    (11, 2, "Light breeze"),
+    (19, 3, "Gentle breeze"),
+    (28, 4, "Moderate breeze"),
+    (38, 5, "Fresh breeze"),
+    (49, 6, "Strong breeze"),
+    (61, 7, "Near gale"),
+    (74, 8, "Gale"),
+    (88, 9, "Strong gale"),
+    (102, 10, "Storm"),
+    (117, 11, "Violent storm"),
+    (math.inf, 12, "Hurricane"),
+]
+
+
+def kmh_to_beaufort(kmh):
+    if kmh is None:
+        return None
+    for max_kmh, num, _label in BEAUFORT_SCALE:
+        if kmh <= max_kmh:
+            return num
+    return 12
+
+
+def beaufort_label(num):
+    for _max_kmh, n, label in BEAUFORT_SCALE:
+        if n == num:
+            return label
+    return ""
+
 
 def load_beaches():
     with open(BEACHES_PATH, encoding="utf-8") as f:
@@ -104,11 +136,13 @@ def fetch_waves(beaches):
     return result
 
 
-def score_beach(beach, distance_km, wind_speed, wind_dir, wave_height, want_toddler, want_bar):
+def score_beach(beach, distance_km, wind_speed, wind_dir, wave_height, want_toddler, want_bar, max_wave, max_beaufort):
     exposed = None
     if wind_dir is not None:
         diff = circular_diff(wind_dir, beach["facing_deg"])
         exposed = diff <= beach["shelter_arc_deg"] / 2
+
+    beaufort = kmh_to_beaufort(wind_speed)
 
     if wave_height is not None:
         chop = wave_height * (1.0 if exposed else 0.6)
@@ -126,19 +160,29 @@ def score_beach(beach, distance_km, wind_speed, wind_dir, wave_height, want_todd
     else:
         calmness = 50.0
 
+    passes_wave = wave_height is None or wave_height <= max_wave
+    passes_wind = beaufort is None or beaufort <= max_beaufort
+    passes_comfort = passes_wave and passes_wind
+    comfort_unknown = wave_height is None and beaufort is None
+
     score = calmness
     score += 10 if beach["toddler_friendly"] else -25 if want_toddler else 0
     score += 10 if beach["has_beach_bar"] else -25 if want_bar else 0
     score -= CROWD_PENALTY.get(beach["crowd_level"], 5)
     score -= distance_km * 0.3
+    score += 0 if passes_comfort else -40
 
     reasons = []
     if wave_height is not None:
-        reasons.append(f"~{wave_height:.1f} m waves expected right now")
-    elif wind_speed is not None:
+        over = "" if passes_wave else f" (over your {max_wave} m limit)"
+        reasons.append(f"~{wave_height:.1f} m waves expected right now{over}")
+    if wind_speed is not None:
         compass = deg_to_compass(wind_dir)
         state = "exposed to" if exposed else "sheltered from"
-        reasons.append(f"{state} the current {compass or ''} wind ({wind_speed:.0f} km/h)".replace("  ", " "))
+        over = "" if passes_wind else f" (over your Bft {max_beaufort} limit)"
+        reasons.append(
+            f"{state} the current {compass or ''} wind: Bft {beaufort} ({beaufort_label(beaufort)}, {wind_speed:.0f} km/h){over}".replace("  ", " ")
+        )
     if beach["toddler_friendly"]:
         reasons.append("toddler-friendly (shallow/gentle entry)")
     if beach["has_beach_bar"]:
@@ -158,8 +202,11 @@ def score_beach(beach, distance_km, wind_speed, wind_dir, wave_height, want_todd
         "exposed_to_wind": exposed,
         "wind_speed_kmh": wind_speed,
         "wind_direction": deg_to_compass(wind_dir),
+        "beaufort": beaufort,
         "wave_height_m": wave_height,
         "chop_source": chop_source,
+        "passes_comfort": passes_comfort,
+        "comfort_unknown": comfort_unknown,
         "toddler_friendly": beach["toddler_friendly"],
         "toddler_notes": beach["toddler_notes"],
         "has_beach_bar": beach["has_beach_bar"],
@@ -215,6 +262,8 @@ def api_recommend():
     radius_km = float(request.args.get("radius_km", 30))
     want_toddler = request.args.get("toddler", "true").lower() != "false"
     want_bar = request.args.get("needs_bar", "true").lower() != "false"
+    max_wave = float(request.args.get("max_wave", 0.3))
+    max_beaufort = int(request.args.get("max_beaufort", 3))
     max_results = int(request.args.get("max_results", 6))
 
     beaches = load_beaches()
@@ -238,11 +287,11 @@ def api_recommend():
     for b, distance in candidates:
         wind_speed, wind_dir = wind_by_id.get(b["id"], (None, None))
         wave_height = wave_by_id.get(b["id"])
-        scored.append(score_beach(b, distance, wind_speed, wind_dir, wave_height, want_toddler, want_bar))
+        scored.append(score_beach(b, distance, wind_speed, wind_dir, wave_height, want_toddler, want_bar, max_wave, max_beaufort))
 
     strict = [
         s for s in scored
-        if (not want_toddler or s["toddler_friendly"]) and (not want_bar or s["has_beach_bar"])
+        if (not want_toddler or s["toddler_friendly"]) and (not want_bar or s["has_beach_bar"]) and s["passes_comfort"]
     ]
     pool = strict if len(strict) >= 3 else scored
     pool.sort(key=lambda s: s["score"], reverse=True)

@@ -8,6 +8,33 @@ const COMPASS_POINTS = [
 ];
 const CROWD_PENALTY = { low: 0, medium: 8, high: 18 };
 
+const BEAUFORT_SCALE = [
+  { max: 1, num: 0, label: "Calm" },
+  { max: 5, num: 1, label: "Light air" },
+  { max: 11, num: 2, label: "Light breeze" },
+  { max: 19, num: 3, label: "Gentle breeze" },
+  { max: 28, num: 4, label: "Moderate breeze" },
+  { max: 38, num: 5, label: "Fresh breeze" },
+  { max: 49, num: 6, label: "Strong breeze" },
+  { max: 61, num: 7, label: "Near gale" },
+  { max: 74, num: 8, label: "Gale" },
+  { max: 88, num: 9, label: "Strong gale" },
+  { max: 102, num: 10, label: "Storm" },
+  { max: 117, num: 11, label: "Violent storm" },
+  { max: Infinity, num: 12, label: "Hurricane" },
+];
+
+function kmhToBeaufort(kmh) {
+  if (kmh === null || kmh === undefined) return null;
+  const step = BEAUFORT_SCALE.find((s) => kmh <= s.max) || BEAUFORT_SCALE[BEAUFORT_SCALE.length - 1];
+  return step.num;
+}
+
+function beaufortLabel(num) {
+  const step = BEAUFORT_SCALE.find((s) => s.num === num);
+  return step ? step.label : "";
+}
+
 let selectedLocation = null; // { lat, lon, label }
 let beachesPromise = fetch("beaches.json").then((r) => r.json());
 
@@ -139,9 +166,10 @@ async function fetchWaves(beaches) {
   }
 }
 
-function scoreBeach(beach, distanceKm, wind, waveHeight, wantToddler, wantBar) {
+function scoreBeach(beach, distanceKm, wind, waveHeight, wantToddler, wantBar, maxWave, maxBeaufort) {
   const windSpeed = wind ? wind.speed : null;
   const windDir = wind ? wind.dir : null;
+  const beaufort = kmhToBeaufort(windSpeed);
 
   let exposed = null;
   if (windDir !== null && windDir !== undefined) {
@@ -162,19 +190,28 @@ function scoreBeach(beach, distanceKm, wind, waveHeight, wantToddler, wantBar) {
 
   const calmness = chop !== null ? Math.max(0, 100 - chop * 80 - (windSpeed || 0) * 0.5) : 50;
 
+  const passesWave = waveHeight === null || waveHeight === undefined || waveHeight <= maxWave;
+  const passesWind = beaufort === null || beaufort === undefined || beaufort <= maxBeaufort;
+  const passesComfort = passesWave && passesWind;
+  const comfortUnknown = (waveHeight === null || waveHeight === undefined) && (beaufort === null || beaufort === undefined);
+
   let score = calmness;
   score += beach.toddler_friendly ? 10 : wantToddler ? -25 : 0;
   score += beach.has_beach_bar ? 10 : wantBar ? -25 : 0;
   score -= CROWD_PENALTY[beach.crowd_level] ?? 5;
   score -= distanceKm * 0.3;
+  score += passesComfort ? 0 : -40;
 
   const reasons = [];
   if (waveHeight !== null && waveHeight !== undefined) {
-    reasons.push(`~${waveHeight.toFixed(1)} m waves expected right now`);
-  } else if (windSpeed !== null && windSpeed !== undefined) {
+    reasons.push(`~${waveHeight.toFixed(1)} m waves expected right now${passesWave ? "" : ` (over your ${maxWave} m limit)`}`);
+  }
+  if (windSpeed !== null && windSpeed !== undefined) {
     const compass = degToCompass(windDir) || "";
     const state = exposed ? "exposed to" : "sheltered from";
-    reasons.push(`${state} the current ${compass} wind (${windSpeed.toFixed(0)} km/h)`.replace("  ", " "));
+    reasons.push(
+      `${state} the current ${compass} wind: Bft ${beaufort} (${beaufortLabel(beaufort)}, ${windSpeed.toFixed(0)} km/h)${passesWind ? "" : ` (over your Bft ${maxBeaufort} limit)`}`.replace("  ", " ")
+    );
   }
   if (beach.toddler_friendly) reasons.push("toddler-friendly (shallow/gentle entry)");
   if (beach.has_beach_bar) reasons.push("has a beach bar/taverna");
@@ -191,8 +228,11 @@ function scoreBeach(beach, distanceKm, wind, waveHeight, wantToddler, wantBar) {
     exposed_to_wind: exposed,
     wind_speed_kmh: windSpeed ?? null,
     wind_direction: degToCompass(windDir),
+    beaufort,
     wave_height_m: waveHeight ?? null,
     chop_source: chopSource,
+    passes_comfort: passesComfort,
+    comfort_unknown: comfortUnknown,
     toddler_friendly: beach.toddler_friendly,
     toddler_notes: beach.toddler_notes,
     has_beach_bar: beach.has_beach_bar,
@@ -214,7 +254,7 @@ function renderResults(results, relaxedFilters) {
   if (relaxedFilters) {
     const note = document.createElement("p");
     note.className = "status-msg";
-    note.textContent = "Not enough beaches matched your must-haves nearby, so filters were relaxed — check the notes on each card.";
+    note.textContent = "Not enough beaches matched your must-haves and wave/wind limits nearby, so filters were relaxed — check the \"Over your limit\" badges below.";
     resultsEl.appendChild(note);
   }
 
@@ -228,9 +268,10 @@ function renderResults(results, relaxedFilters) {
     card.className = `beach-card ${idx === 0 ? "rank-1" : ""}`;
 
     let calmBadge;
-    if (beach.calmness >= 65) calmBadge = badge("Calm", "good");
-    else if (beach.calmness >= 40) calmBadge = badge("Some chop", "warn");
-    else calmBadge = badge("Choppy/windy", "bad");
+    if (beach.comfort_unknown) calmBadge = badge("Conditions unknown", "warn");
+    else if (!beach.passes_comfort) calmBadge = badge("Over your limit", "bad");
+    else if (beach.calmness >= 65) calmBadge = badge("Calm", "good");
+    else calmBadge = badge("Within your limit", "warn");
 
     const badges = [
       calmBadge,
@@ -244,7 +285,7 @@ function renderResults(results, relaxedFilters) {
       conditions.push(`🌊 ${beach.wave_height_m.toFixed(1)} m waves`);
     }
     if (beach.wind_speed_kmh !== null && beach.wind_speed_kmh !== undefined) {
-      conditions.push(`💨 ${beach.wind_speed_kmh.toFixed(0)} km/h ${beach.wind_direction || ""}`);
+      conditions.push(`💨 Bft ${beach.beaufort} (${beach.wind_speed_kmh.toFixed(0)} km/h ${beach.wind_direction || ""})`);
     }
 
     card.innerHTML = `
@@ -269,6 +310,8 @@ findBtn.addEventListener("click", async () => {
   }
   const wantToddler = document.getElementById("toddler-check").checked;
   const wantBar = document.getElementById("bar-check").checked;
+  const maxWave = parseFloat(document.getElementById("max-wave-select").value);
+  const maxBeaufort = parseInt(document.getElementById("max-wind-select").value, 10);
   const radiusKm = parseFloat(document.getElementById("radius-select").value);
 
   findBtn.disabled = true;
@@ -294,11 +337,11 @@ findBtn.addEventListener("click", async () => {
     const [windById, waveById] = await Promise.all([fetchWind(beachList), fetchWaves(beachList)]);
 
     const scored = candidates.map((c) =>
-      scoreBeach(c.beach, c.distance, windById[c.beach.id], waveById[c.beach.id], wantToddler, wantBar)
+      scoreBeach(c.beach, c.distance, windById[c.beach.id], waveById[c.beach.id], wantToddler, wantBar, maxWave, maxBeaufort)
     );
 
     const strict = scored.filter(
-      (s) => (!wantToddler || s.toddler_friendly) && (!wantBar || s.has_beach_bar)
+      (s) => (!wantToddler || s.toddler_friendly) && (!wantBar || s.has_beach_bar) && s.passes_comfort
     );
     const relaxedFilters = strict.length < 3;
     const pool = relaxedFilters ? scored : strict;

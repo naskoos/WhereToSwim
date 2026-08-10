@@ -28,6 +28,26 @@
         <label><input type="checkbox" id="toddler-check" checked /> Traveling with a toddler</label>
         <label><input type="checkbox" id="bar-check" checked /> Needs a beach bar / toilet</label>
         <label>
+          Max wave height:
+          <select id="max-wave-select">
+            <option value="0.2">0.2 m &mdash; glassy calm</option>
+            <option value="0.3" selected>0.3 m &mdash; toddler-safe</option>
+            <option value="0.5">0.5 m &mdash; light chop OK</option>
+            <option value="1.0">1.0 m &mdash; don't filter much</option>
+          </select>
+        </label>
+        <label>
+          Max wind:
+          <select id="max-wind-select">
+            <option value="1">Bft 1 &mdash; light air</option>
+            <option value="2">Bft 2 &mdash; light breeze</option>
+            <option value="3" selected>Bft 3 &mdash; gentle breeze (toddler-safe)</option>
+            <option value="4">Bft 4 &mdash; moderate breeze</option>
+            <option value="5">Bft 5 &mdash; fresh breeze</option>
+            <option value="6">Bft 6 &mdash; strong breeze</option>
+          </select>
+        </label>
+        <label>
           Search radius:
           <select id="radius-select">
             <option value="15">15 km</option>

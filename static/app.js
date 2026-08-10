@@ -71,7 +71,7 @@ function renderResults(data) {
   if (data.relaxed_filters) {
     const note = document.createElement("p");
     note.className = "status-msg";
-    note.textContent = "Not enough beaches matched your must-haves nearby, so filters were relaxed — check the notes on each card.";
+    note.textContent = "Not enough beaches matched your must-haves and wave/wind limits nearby, so filters were relaxed — check the \"Over your limit\" badges below.";
     resultsEl.appendChild(note);
   }
 
@@ -85,9 +85,10 @@ function renderResults(data) {
     card.className = `beach-card ${idx === 0 ? "rank-1" : ""}`;
 
     let calmBadge;
-    if (beach.calmness >= 65) calmBadge = badge("Calm", "good");
-    else if (beach.calmness >= 40) calmBadge = badge("Some chop", "warn");
-    else calmBadge = badge("Choppy/windy", "bad");
+    if (beach.comfort_unknown) calmBadge = badge("Conditions unknown", "warn");
+    else if (!beach.passes_comfort) calmBadge = badge("Over your limit", "bad");
+    else if (beach.calmness >= 65) calmBadge = badge("Calm", "good");
+    else calmBadge = badge("Within your limit", "warn");
 
     const badges = [
       calmBadge,
@@ -101,7 +102,7 @@ function renderResults(data) {
       conditions.push(`🌊 ${beach.wave_height_m.toFixed(1)} m waves`);
     }
     if (beach.wind_speed_kmh !== null && beach.wind_speed_kmh !== undefined) {
-      conditions.push(`💨 ${beach.wind_speed_kmh.toFixed(0)} km/h ${beach.wind_direction || ""}`);
+      conditions.push(`💨 Bft ${beach.beaufort} (${beach.wind_speed_kmh.toFixed(0)} km/h ${beach.wind_direction || ""})`);
     }
 
     card.innerHTML = `
@@ -126,6 +127,8 @@ findBtn.addEventListener("click", async () => {
   }
   const toddler = document.getElementById("toddler-check").checked;
   const needsBar = document.getElementById("bar-check").checked;
+  const maxWave = document.getElementById("max-wave-select").value;
+  const maxBeaufort = document.getElementById("max-wind-select").value;
   const radius = document.getElementById("radius-select").value;
 
   findBtn.disabled = true;
@@ -139,6 +142,8 @@ findBtn.addEventListener("click", async () => {
       radius_km: radius,
       toddler,
       needs_bar: needsBar,
+      max_wave: maxWave,
+      max_beaufort: maxBeaufort,
     });
     const resp = await fetch(`/api/recommend?${params.toString()}`);
     const data = await resp.json();
