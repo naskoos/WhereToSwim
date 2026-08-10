@@ -12,14 +12,14 @@
     "has_beach_bar": true,
     "bar_notes": "Several cafes/tavernas along the beach road.",
     "crowd_level": "medium",
-    "notes": "The main town beach, faces the open Strymonic/Ierissos Gulf so it takes the full force of easterly winds."
+    "notes": "The main town beach, faces the open Strymonic/Ierissos Gulf so it takes the full force of easterly winds. Coordinates verified against Wikipedia."
   },
   {
     "id": "nea_roda",
     "name": "Nea Roda Beach",
     "area": "Nea Roda / Isthmus",
-    "lat": 40.3283,
-    "lon": 23.9911,
+    "lat": 40.3806,
+    "lon": 23.925,
     "facing_deg": 100,
     "shelter_arc_deg": 130,
     "toddler_friendly": true,
@@ -27,14 +27,14 @@
     "has_beach_bar": true,
     "bar_notes": "Tavernas and a couple of beach bars near the village.",
     "crowd_level": "low",
-    "notes": "~20-25 min from Ierissos. Still on the east (Strymonic Gulf) side, so exposed to the same wind direction as Ierissos."
+    "notes": "On the Strymonic/Ierissos Gulf side of the isthmus, so exposed to the same wind direction as Ierissos. Coordinates verified against Wikipedia."
   },
   {
     "id": "ouranoupoli",
     "name": "Ouranoupoli Beach",
     "area": "Ouranoupoli",
-    "lat": 40.3125,
-    "lon": 24.0142,
+    "lat": 40.3264,
+    "lon": 23.9811,
     "facing_deg": 240,
     "shelter_arc_deg": 120,
     "toddler_friendly": true,
@@ -42,14 +42,14 @@
     "has_beach_bar": true,
     "bar_notes": "Busy promenade with many cafes, bars and restaurants, plus toilets.",
     "crowd_level": "high",
-    "notes": "~25-30 min from Ierissos. Faces the Singitic Gulf (west side of the isthmus) - the opposite side from Ierissos, so it's often calm when Ierissos has easterly wind, and vice versa."
+    "notes": "Faces the Singitic Gulf (west side of the isthmus) - the opposite side from Ierissos, so it's often calm when Ierissos has easterly wind, and vice versa. Coordinates verified against Wikipedia."
   },
   {
     "id": "trypoti",
-    "name": "Trypoti Beach",
+    "name": "Trypiti Beach",
     "area": "Ouranoupoli area",
-    "lat": 40.33,
-    "lon": 23.995,
+    "lat": 40.335,
+    "lon": 23.978,
     "facing_deg": 250,
     "shelter_arc_deg": 90,
     "toddler_friendly": true,
@@ -57,29 +57,14 @@
     "has_beach_bar": true,
     "bar_notes": "Well-known beach bar right on the sand.",
     "crowd_level": "high",
-    "notes": "~20 min from Ierissos. A narrower, more sheltered cove than Ouranoupoli town beach, but popular and can fill up."
-  },
-  {
-    "id": "kastri",
-    "name": "Kastri Beach",
-    "area": "Ouranoupoli area",
-    "lat": 40.335,
-    "lon": 23.985,
-    "facing_deg": 230,
-    "shelter_arc_deg": 100,
-    "toddler_friendly": true,
-    "toddler_notes": "Sandy, generally shallow, less developed than Trypoti.",
-    "has_beach_bar": false,
-    "bar_notes": "No dedicated beach bar on-site; bring your own supplies or drive to nearby Ouranoupoli/Trypoti.",
-    "crowd_level": "low",
-    "notes": "~20-25 min from Ierissos. Good backup if you don't need a beach bar and want fewer people."
+    "notes": "The northern end of the same beach strip as Ouranoupoli (they're continuous), just before the Ammouliani ferry port. Position is an estimate anchored to Ouranoupoli's verified coordinates, not independently confirmed - double-check on a map before relying on it for turn-by-turn directions."
   },
   {
     "id": "ammouliani_alykes",
     "name": "Alykes Beach, Ammouliani",
     "area": "Ammouliani Island",
-    "lat": 40.2649,
-    "lon": 23.9791,
+    "lat": 40.325,
+    "lon": 23.91,
     "facing_deg": 260,
     "shelter_arc_deg": 110,
     "toddler_friendly": true,
@@ -87,44 +72,44 @@
     "has_beach_bar": true,
     "bar_notes": "Tavernas near the beach.",
     "crowd_level": "medium",
-    "notes": "Requires a short ferry from Tripiti/Ouranoupoli (~10 min crossing) plus driving. Worth it if you want guaranteed calm water."
+    "notes": "On the western/southwestern coast of Ammouliani island, overlooking Sithonia. Requires the short ferry from Tripiti (~15 min crossing) plus driving. Position is estimated from the island's verified center coordinates (Wikipedia), not the exact beach - double-check on a map before relying on it for directions."
   },
   {
     "id": "ammouliani_megali_ammos",
     "name": "Megali Ammos Beach, Ammouliani",
     "area": "Ammouliani Island",
-    "lat": 40.27,
-    "lon": 23.97,
-    "facing_deg": 220,
+    "lat": 40.318,
+    "lon": 23.925,
+    "facing_deg": 170,
     "shelter_arc_deg": 100,
     "toddler_friendly": true,
-    "toddler_notes": "Wide sandy beach, shallow water.",
+    "toddler_notes": "Wide white-sand beach, very shallow water - one of the best for small children on the island.",
     "has_beach_bar": true,
     "bar_notes": "Beach bar/taverna on site.",
     "crowd_level": "medium",
-    "notes": "Same ferry trip as Alykes Beach; a bit more open/wider bay."
+    "notes": "The southernmost beach on Ammouliani island, facing the Drenia islets and Ouranoupoli. Same ferry trip as Alykes Beach. Position is estimated from the island's verified center coordinates (Wikipedia), not the exact beach - double-check on a map before relying on it for directions."
   },
   {
     "id": "pyrgadikia",
     "name": "Pyrgadikia Beach",
     "area": "Pyrgadikia",
-    "lat": 40.302,
-    "lon": 23.885,
-    "facing_deg": 100,
+    "lat": 40.383,
+    "lon": 23.7,
+    "facing_deg": 250,
     "shelter_arc_deg": 120,
     "toddler_friendly": true,
     "toddler_notes": "Small, calm fishing-village beach, shallow water.",
     "has_beach_bar": true,
     "bar_notes": "A couple of tavernas by the water.",
     "crowd_level": "low",
-    "notes": "~30-35 min from Ierissos, further down the Strymonic Gulf coast. Still east-facing like Ierissos."
+    "notes": "On the Singitic Gulf coast (same side as Ouranoupoli/Ammouliani, not the Strymonic side like Ierissos), further southwest toward the base of Sithonia. Meaningfully further than Ouranoupoli/Ammouliani and possibly a longer, winding drive - confirm the route and travel time before heading out. Coordinates verified against Wikipedia."
   },
   {
     "id": "stratoni",
     "name": "Stratoni Beach",
     "area": "Stratoni",
-    "lat": 40.488,
-    "lon": 23.836,
+    "lat": 40.517,
+    "lon": 23.817,
     "facing_deg": 90,
     "shelter_arc_deg": 130,
     "toddler_friendly": true,
@@ -132,14 +117,14 @@
     "has_beach_bar": true,
     "bar_notes": "Beachfront cafes and restaurants.",
     "crowd_level": "low",
-    "notes": "~35-40 min north of Ierissos. East-facing, same wind exposure as Ierissos."
+    "notes": "North of Ierissos on the same Strymonic Gulf coast, so same wind exposure. Coordinates verified against Wikipedia."
   },
   {
     "id": "stavros",
     "name": "Stavros Beach",
     "area": "Stavros",
-    "lat": 40.652,
-    "lon": 23.728,
+    "lat": 40.665,
+    "lon": 23.697,
     "facing_deg": 110,
     "shelter_arc_deg": 130,
     "toddler_friendly": true,
@@ -147,14 +132,14 @@
     "has_beach_bar": true,
     "bar_notes": "Several beach bars and tavernas along the front.",
     "crowd_level": "low",
-    "notes": "~50 min north of Ierissos - only worth the drive if you're exploring further afield."
+    "notes": "Further north up the Strymonic Gulf coast, technically in the Thessaloniki regional unit rather than Chalkidiki - only worth the drive if you're exploring further afield. Coordinates verified against Wikipedia."
   },
   {
     "id": "vourvourou",
     "name": "Vourvourou (Karidi/Lagoon area)",
     "area": "Sithonia",
-    "lat": 40.245,
-    "lon": 23.8,
+    "lat": 40.1786,
+    "lon": 23.7992,
     "facing_deg": 100,
     "shelter_arc_deg": 60,
     "toddler_friendly": true,
@@ -162,14 +147,14 @@
     "has_beach_bar": true,
     "bar_notes": "Multiple beach bars/tavernas.",
     "crowd_level": "high",
-    "notes": "~1h10-1h20 drive from Ierissos. Worth it on a genuinely windy day since the lagoon stays calm more often than open beaches."
+    "notes": "On the east coast of Sithonia, between Ormos Panagias and Sarti - worth the longer drive on a genuinely windy day since the lagoon stays calm more often than open beaches. Coordinates verified against Wikipedia."
   },
   {
     "id": "sarti",
     "name": "Sarti Beach",
     "area": "Sithonia",
-    "lat": 40.103,
-    "lon": 23.985,
+    "lat": 40.0981,
+    "lon": 23.9792,
     "facing_deg": 100,
     "shelter_arc_deg": 150,
     "toddler_friendly": true,
@@ -177,14 +162,14 @@
     "has_beach_bar": true,
     "bar_notes": "Lots of beach bars and restaurants along the promenade.",
     "crowd_level": "high",
-    "notes": "~1h30 drive from Ierissos. Open bay - only calm when wind isn't from the east."
+    "notes": "Open bay on Sithonia's east coast - only calm when wind isn't from the east. Coordinates verified against Wikipedia."
   },
   {
     "id": "toroni",
     "name": "Toroni Beach",
     "area": "Sithonia",
-    "lat": 39.965,
-    "lon": 23.705,
+    "lat": 39.983,
+    "lon": 23.9,
     "facing_deg": 250,
     "shelter_arc_deg": 140,
     "toddler_friendly": true,
@@ -192,14 +177,14 @@
     "has_beach_bar": true,
     "bar_notes": "Tavernas and beach bars along the bay.",
     "crowd_level": "medium",
-    "notes": "~1h45 drive from Ierissos. West-facing, so it can be calm when the east coast is choppy."
+    "notes": "At the southwest tip of Sithonia on the Toronean Gulf - west-facing, so it can be calm when the east coast is choppy. Coordinates verified against Wikipedia."
   },
   {
     "id": "possidi",
     "name": "Possidi Beach",
     "area": "Kassandra",
-    "lat": 39.955,
-    "lon": 23.36,
+    "lat": 39.9582,
+    "lon": 23.3608,
     "facing_deg": 270,
     "shelter_arc_deg": 130,
     "toddler_friendly": true,
@@ -207,14 +192,14 @@
     "has_beach_bar": true,
     "bar_notes": "Beach cantina/bar near the lighthouse.",
     "crowd_level": "medium",
-    "notes": "~2h drive from Ierissos - only realistic if you're already on Kassandra that day."
+    "notes": "On the Kassandra peninsula - a long drive from Ierissos, only realistic if you're already over there that day. Coordinates verified against Wikidata."
   },
   {
     "id": "sani",
     "name": "Sani Beach",
     "area": "Kassandra",
-    "lat": 40.035,
-    "lon": 23.345,
+    "lat": 40.1011,
+    "lon": 23.3068,
     "facing_deg": 260,
     "shelter_arc_deg": 120,
     "toddler_friendly": true,
@@ -222,6 +207,6 @@
     "has_beach_bar": true,
     "bar_notes": "Multiple beach bars/restaurants.",
     "crowd_level": "high",
-    "notes": "~2h drive from Ierissos - only realistic if you're already on Kassandra that day."
+    "notes": "On the Kassandra peninsula - a long drive from Ierissos, only realistic if you're already over there that day. Coordinates verified against the resort's published location."
   }
 ]
