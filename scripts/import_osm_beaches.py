@@ -92,24 +92,28 @@ def overpass_query(bbox):
     )
 
 
-def fetch_overpass(query):
+def fetch_overpass(query, retries=2, backoff=8):
     body = ("data=" + urllib.parse.quote(query)).encode("utf-8")
-    for url in OVERPASS_URLS:
-        try:
-            req = urllib.request.Request(
-                url,
-                data=body,
-                headers={
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "User-Agent": USER_AGENT,
-                    "Accept": "*/*",
-                },
-            )
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                return json.loads(resp.read().decode("utf-8"))
-        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError) as e:
-            print(f"  overpass request failed on {url}: {e}", flush=True)
-            continue
+    for attempt in range(retries):
+        for url in OVERPASS_URLS:
+            try:
+                req = urllib.request.Request(
+                    url,
+                    data=body,
+                    headers={
+                        "Content-Type": "application/x-www-form-urlencoded",
+                        "User-Agent": USER_AGENT,
+                        "Accept": "*/*",
+                    },
+                )
+                with urllib.request.urlopen(req, timeout=60) as resp:
+                    return json.loads(resp.read().decode("utf-8"))
+            except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError) as e:
+                print(f"  overpass request failed on {url}: {e}", flush=True)
+                continue
+        if attempt < retries - 1:
+            print(f"  retrying same query in {backoff}s...", flush=True)
+            time.sleep(backoff)
     return None
 
 
@@ -120,6 +124,45 @@ def element_latlon(el):
     if center:
         return center["lat"], center["lon"]
     return None
+
+
+def split_bbox(bbox):
+    """Halve a bbox along its longer dimension."""
+    s, w, n, e = bbox
+    if (n - s) >= (e - w):
+        mid = (s + n) / 2
+        return [(s, w, mid, e), (mid, w, n, e)]
+    mid = (w + e) / 2
+    return [(s, w, n, mid), (s, mid, n, e)]
+
+
+def fetch_region_adaptive(name, bbox, max_depth=5, min_span_deg=0.08):
+    """Fetch a region; on failure, recursively split into smaller pieces and
+    retry those instead of giving up on the whole area. Returns (elements, failed_labels)."""
+
+    def _fetch(label, box, depth):
+        print(f"Querying {label} {box} ...", flush=True)
+        data = fetch_overpass(overpass_query(box))
+        if data and isinstance(data.get("elements"), list):
+            print(f"  ok, {len(data['elements'])} raw elements", flush=True)
+            return data["elements"], []
+
+        s, w, n, e = box
+        lat_span, lon_span = n - s, e - w
+        if depth >= max_depth or (lat_span <= min_span_deg and lon_span <= min_span_deg):
+            print(f"  giving up on {label} (depth={depth}, span={lat_span:.2f}x{lon_span:.2f})", flush=True)
+            return [], [label]
+
+        print(f"  splitting {label} into two smaller pieces and retrying...", flush=True)
+        elements, failed = [], []
+        for i, part in enumerate(split_bbox(box), start=1):
+            time.sleep(2)
+            sub_elements, sub_failed = _fetch(f"{label} [{depth + 1}.{i}]", part, depth + 1)
+            elements.extend(sub_elements)
+            failed.extend(sub_failed)
+        return elements, failed
+
+    return _fetch(name, bbox, 0)
 
 
 def main():
@@ -144,16 +187,14 @@ def main():
         curated = json.load(f)
 
     all_candidates = []
+    all_failed_labels = []
     for region_name, bbox in regions.items():
-        print(f"Querying {region_name} {bbox} ...", flush=True)
-        data = fetch_overpass(overpass_query(bbox))
-        if not data or not isinstance(data.get("elements"), list):
-            print(f"  no data for {region_name}, skipping", flush=True)
-            continue
+        elements, failed_labels = fetch_region_adaptive(region_name, bbox)
+        all_failed_labels.extend(failed_labels)
 
         raw_beaches = []
         amenities = []
-        for el in data["elements"]:
+        for el in elements:
             pos = element_latlon(el)
             if not pos:
                 continue
@@ -186,8 +227,13 @@ def main():
                 "bar_count_nearby": bar_count,
                 "has_toilet_nearby": has_toilet,
             })
-        print(f"  {len(raw_beaches)} beach points kept", flush=True)
+        print(f"  region total: {len(raw_beaches)} beach points kept", flush=True)
         time.sleep(2)  # be polite to the free API between region queries
+
+    if all_failed_labels:
+        print(f"\nStill failed after retries/splits ({len(all_failed_labels)} pieces): {all_failed_labels}", flush=True)
+        with open("osm_import_failed_regions.txt", "w", encoding="utf-8") as f:
+            f.write("\n".join(all_failed_labels) + "\n")
 
     # Dedupe against each other (keep first / prefer named)
     deduped = []
