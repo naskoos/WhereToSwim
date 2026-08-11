@@ -1,0 +1,24 @@
+name: Verify live APIs (manual)
+
+# The dev sandbox has no outbound access to Open-Meteo, so the only way to
+# confirm the app reads the field names the API really returns is from a
+# runner that can reach it.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Call the exact URLs the app builds
+        run: python -u scripts/verify_apis.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: api-verification
+          path: api_verification.json
+          retention-days: 7
