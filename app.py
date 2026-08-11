@@ -20,6 +20,8 @@ OVERPASS_TIMEOUT = 15
 OSM_DEDUPE_KM = 0.3
 OSM_AMENITY_RADIUS_KM = 0.4
 OSM_MAX_RADIUS_KM = 40
+MAX_CANDIDATES_FOR_WEATHER = 30
+MIN_CURATED_BEFORE_SKIPPING_OSM = 8
 SAND_SURFACES = {"sand", "fine_sand", "sandy"}
 ROUGH_SURFACES = {"pebblestone", "pebbles", "shingle", "rock", "rocks", "gravel", "stone"}
 
@@ -396,13 +398,20 @@ def api_recommend():
             ((b, haversine_km(lat, lon, b["lat"], b["lon"])) for b in beaches),
             key=lambda t: t[1],
         )[:5]
+    else:
+        candidates.sort(key=lambda t: t[1])
+        candidates = candidates[:MAX_CANDIDATES_FOR_WEATHER]
 
-    osm_beaches = fetch_osm_beaches(lat, lon, radius_km, beaches)
-    osm_candidates = sorted(
-        ((b, haversine_km(lat, lon, b["lat"], b["lon"])) for b in osm_beaches),
-        key=lambda t: t[1],
-    )[:15]
-    candidates = candidates + osm_candidates
+    # The curated list now has nationwide OSM-sourced coverage, so a live Overpass
+    # query is only worth its (often slow/unreliable) round trip when curated
+    # coverage near this location is thin.
+    if len(candidates) < MIN_CURATED_BEFORE_SKIPPING_OSM:
+        osm_beaches = fetch_osm_beaches(lat, lon, radius_km, beaches)
+        osm_candidates = sorted(
+            ((b, haversine_km(lat, lon, b["lat"], b["lon"])) for b in osm_beaches),
+            key=lambda t: t[1],
+        )[:15]
+        candidates = candidates + osm_candidates
 
     beach_list = [b for b, _ in candidates]
     wind_by_id = fetch_wind(beach_list)

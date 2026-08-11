@@ -8,6 +8,8 @@ const OVERPASS_URLS = [
 const OSM_DEDUPE_KM = 0.3;
 const OSM_AMENITY_RADIUS_KM = 0.4;
 const OSM_MAX_RADIUS_KM = 40;
+const MAX_CANDIDATES_FOR_WEATHER = 30;
+const MIN_CURATED_BEFORE_SKIPPING_OSM = 8;
 const SAND_SURFACES = ["sand", "fine_sand", "sandy"];
 const ROUGH_SURFACES = ["pebblestone", "pebbles", "shingle", "rock", "rocks", "gravel", "stone"];
 
@@ -454,20 +456,31 @@ findBtn.addEventListener("click", async () => {
 
     let curatedCandidates = allBeaches
       .map((b) => ({ beach: b, distance: haversineKm(lat, lon, b.lat, b.lon) }))
-      .filter((c) => c.distance <= radiusKm);
+      .filter((c) => c.distance <= radiusKm)
+      .sort((a, b) => a.distance - b.distance);
 
     if (!curatedCandidates.length) {
       curatedCandidates = allBeaches
         .map((b) => ({ beach: b, distance: haversineKm(lat, lon, b.lat, b.lon) }))
         .sort((a, b) => a.distance - b.distance)
         .slice(0, 5);
+    } else {
+      // Cap how many go on to the (slow, per-location) weather lookups - the top few
+      // dozen nearest are what actually surface in the top 6 anyway.
+      curatedCandidates = curatedCandidates.slice(0, MAX_CANDIDATES_FOR_WEATHER);
     }
 
-    const osmBeaches = await fetchOsmBeaches(lat, lon, radiusKm, allBeaches);
-    const osmCandidates = osmBeaches
-      .map((b) => ({ beach: b, distance: haversineKm(lat, lon, b.lat, b.lon) }))
-      .sort((a, b) => a.distance - b.distance)
-      .slice(0, 15);
+    // The curated list now has nationwide OSM-sourced coverage, so a live Overpass
+    // query is only worth its (often slow/unreliable) round trip when curated
+    // coverage near this location is thin.
+    let osmCandidates = [];
+    if (curatedCandidates.length < MIN_CURATED_BEFORE_SKIPPING_OSM) {
+      const osmBeaches = await fetchOsmBeaches(lat, lon, radiusKm, allBeaches);
+      osmCandidates = osmBeaches
+        .map((b) => ({ beach: b, distance: haversineKm(lat, lon, b.lat, b.lon) }))
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, 15);
+    }
 
     const candidates = [...curatedCandidates, ...osmCandidates];
 
