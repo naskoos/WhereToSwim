@@ -159,6 +159,48 @@ if tl is not None:
                            "timezone": entry.get("timezone"), "sunrise": daily.get("sunrise"),
                            "sunset": daily.get("sunset")}
 
+# ------------------------------------------- marine API: sea temperature trend
+# For the sea-temperature evolution chart: recent past + forecast in one call.
+# past_days is the parameter in question - if the marine API rejects it, or
+# silently returns forecast only, the chart has nothing to plot.
+hist_url = (
+    f"{MARINE_URL}?latitude={POINTS[1][1]}&longitude={POINTS[1][2]}"
+    f"&hourly=sea_surface_temperature,wave_height&past_days=7&forecast_days=3&timezone=auto"
+)
+hist, hist_err = fetch("marine API — sea temperature history + forecast (past_days)", hist_url)
+if hist is not None:
+    entry = as_list(hist)[0]
+    hourly = entry.get("hourly", {}) or {}
+    times = hourly.get("time") or []
+    temps = hourly.get("sea_surface_temperature") or []
+    waves = hourly.get("wave_height") or []
+    print(f"  hourly keys: {sorted(hourly.keys())}", flush=True)
+    print(f"  time: {len(times)} values" + (f"  {times[0]} .. {times[-1]}" if times else ""), flush=True)
+    print(f"  sea_surface_temperature: {len(temps)} values", flush=True)
+    print(f"  wave_height: {len(waves)} values", flush=True)
+
+    real = [t for t in temps if t is not None]
+    if real:
+        print(f"  range {min(real)}°C .. {max(real)}°C, nulls={len(temps) - len(real)}", flush=True)
+        # Daily means make the shape of the trend obvious in the log.
+        by_day = {}
+        for t, v in zip(times, temps):
+            if v is not None:
+                by_day.setdefault(t[:10], []).append(v)
+        print("  daily mean sea temp:", flush=True)
+        for day in sorted(by_day):
+            vals = by_day[day]
+            print(f"    {day}  {sum(vals)/len(vals):.2f}°C  (n={len(vals)}, "
+                  f"min {min(vals):.1f}, max {max(vals):.1f})", flush=True)
+        results["sea_history"] = {"hours": len(times), "first": times[0], "last": times[-1],
+                                  "days": {d: round(sum(v)/len(v), 2) for d, v in sorted(by_day.items())}}
+        # 10 days of hourly data should be ~240 points; far fewer means past_days was ignored.
+        if len(times) < 200:
+            problems.append(f"sea history: only {len(times)} hourly values, expected ~240 (past_days may be ignored)")
+    else:
+        problems.append("sea history: sea_surface_temperature returned no values")
+        results["sea_history"] = {"error": "no values"}
+
 # -------------------------------------------------------------------- geocoder
 geo_url = f"{GEOCODE_URL}?name={urllib.parse.quote('Chania')}&count=6&language=en&format=json"
 geo, geo_err = fetch("geocoding API — place search", geo_url)
