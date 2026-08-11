@@ -37,7 +37,7 @@ jobs:
           FLAG=""
           if [ "${{ inputs.scope }}" = "all" ]; then FLAG="--all"; fi
           if [ -n "${{ inputs.regions }}" ]; then FLAG="--regions=${{ inputs.regions }}"; fi
-          python -u scripts/reverse_geocode.py $FLAG
+          python -u scripts/reverse_geocode.py "$FLAG"
       - uses: actions/upload-artifact@v4
         with:
           name: geocode-results-${{ inputs.scope }}
@@ -47,8 +47,12 @@ jobs:
         run: |
           git config user.name "geocode-bot"
           git config user.email "actions@github.com"
+          OUT_NAME="geocode_results.json"
+          if [ -n "${{ inputs.regions }}" ]; then OUT_NAME="geocode_results_regions.json"; fi
           rm -f osm_bulk_beaches.json  # avoid conflicting with the tracked copy on osm-bulk-review
+          mv geocode_results.json /tmp/geocode_results_new.json  # move out of the way; osm-bulk-review may already track a file with this name
           git checkout osm-bulk-review
-          git add -f geocode_results.json
-          git commit -m "Reverse geocode results (scope=${{ inputs.scope }}, run ${{ github.run_id }})" || echo "nothing to commit"
+          cp /tmp/geocode_results_new.json "$OUT_NAME"
+          git add -f "$OUT_NAME"
+          git commit -m "Reverse geocode results (scope=${{ inputs.scope }}, regions=${{ inputs.regions }}, run ${{ github.run_id }})" || echo "nothing to commit"
           git push origin osm-bulk-review
