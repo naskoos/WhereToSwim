@@ -3,11 +3,12 @@ import math
 import os
 
 import requests
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, request, send_from_directory
 
 app = Flask(__name__)
 
 BEACHES_PATH = os.path.join(os.path.dirname(__file__), "beaches.json")
+SITE_DIR = os.path.join(os.path.dirname(__file__), "site")
 GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search"
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 MARINE_URL = "https://marine-api.open-meteo.com/v1/marine"
@@ -340,7 +341,14 @@ def score_beach(beach, distance_km, wind_speed, wind_dir, wave_height, want_todd
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    # The browser app in site/ is the single source of truth for the UI, so the
+    # local Flask server hands out exactly what the hosted version serves.
+    return send_from_directory(SITE_DIR, "index.html")
+
+
+@app.route("/<path:filename>")
+def site_asset(filename):
+    return send_from_directory(SITE_DIR, filename)
 
 
 @app.route("/api/geocode")

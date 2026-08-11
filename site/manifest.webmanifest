@@ -1,0 +1,20 @@
+{
+  "name": "Where To Swim — Greece",
+  "short_name": "Where To Swim",
+  "description": "Find a calm, safe place to swim anywhere in Greece — live wind, waves, sea temperature and UV.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#eef3f6",
+  "theme_color": "#0b7c95",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
