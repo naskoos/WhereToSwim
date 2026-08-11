@@ -1445,6 +1445,9 @@ async function openSheet(id) {
     </div>
     <div class="sheet-actions">
       <a class="btn-action primary" href="${r.mapsUrl}" target="_blank" rel="noopener">${icon("route")} Directions</a>
+      <a class="btn-action icon-only" href="${reportUrl(b)}" target="_blank" rel="noopener"
+         id="sheet-edit" aria-label="Correct this beach's details"
+         title="Something wrong or out of date? Correct it">${icon("edit")}</a>
       <button class="btn-action icon-only" type="button" id="sheet-fav" aria-label="Save"
               style="${fav ? "color:var(--bad)" : ""}">${icon("heart")}</button>
       <button class="btn-action icon-only" type="button" id="sheet-share" aria-label="Share">${icon("share")}</button>
