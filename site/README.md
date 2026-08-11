@@ -48,6 +48,42 @@ You can still fine-tune the exact thresholds if you want them.
 - **Share a beach** as a link that opens straight to that spot.
 - **Light and dark themes**, following your phone or toggled manually.
 
+## Corrections from people who've been there
+
+Most beaches come from OpenStreetMap, so facilities are often missing — and
+facilities don't stay true anyway. Beach bars in Greece open and close between
+summers, so "there was a bar here last August" is a claim about last August.
+
+So the app separates two kinds of fact:
+
+- **Durable** — where a beach is, which way it faces, whether the shore is sand
+  or shingle. Report it once and it stands.
+- **Seasonal** — bars, toilets, how busy it gets. These are dated, and they
+  **expire when a new swimming season starts**. Until somebody confirms them
+  again the app treats the field as unknown rather than as fact, and says so.
+
+Tap **"Something wrong or out of date? Report it"** on any beach. It opens a
+pre-filled form; submitting it needs a GitHub account, which is what makes
+attribution and abuse handling work without this app running a server or
+holding anyone's data.
+
+A bot (`scripts/aggregate_community.py`) rebuilds `community.json` from those
+reports on every submission and nightly. It applies a field only when
+agreements outnumber disagreements, records who said what and when, caps how
+much one account can change in a single run, checks values against the field's
+type, rejects positions outside Greece or more than 8 km from the beach they
+describe, and refuses links in free text. A maintainer can label a report
+`verified` to make it count double, or `rejected` to veto it. Everything
+rejected is listed in the job log with a reason, so a good report that trips a
+check can be spotted rather than silently dropped.
+
+`beaches.json` is never modified by this; the community layer is an overlay
+applied at load time, so the two can always be compared.
+
+**Current limitation:** reports can correct existing fields, but new beach
+entries (like splitting a long beach into its distinct ends) still have to be
+added by a maintainer.
+
 ## Where the data comes from
 
 - **Conditions** — [Open-Meteo](https://open-meteo.com/): forecast API for

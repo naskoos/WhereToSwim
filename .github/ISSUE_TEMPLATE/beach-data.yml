@@ -1,0 +1,86 @@
+name: Correct beach information
+description: Something about a beach is wrong or out of date
+title: "[data] "
+labels: ["beach-data"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping. Most of this app's 2,600+ beaches come from
+        OpenStreetMap, so facilities are often missing or out of date —
+        beach bars in particular open and close between summers.
+
+        Reports are dated. Facilities are treated as true only for the season
+        they were confirmed in, and need reconfirming each summer.
+
+  - type: input
+    id: beach_id
+    attributes:
+      label: Beach ID
+      description: Filled in automatically when you tap "Report it" in the app.
+    validations:
+      required: true
+
+  - type: input
+    id: beach_name
+    attributes:
+      label: Beach name
+    validations:
+      required: false
+
+  - type: dropdown
+    id: field
+    attributes:
+      label: What needs changing
+      options:
+        - has_beach_bar
+        - bar_notes
+        - crowd_level
+        - toddler_friendly
+        - name
+        - lat
+        - lon
+        - facing_deg
+        - shelter_arc_deg
+    validations:
+      required: true
+
+  - type: dropdown
+    id: stance
+    attributes:
+      label: Is this right or wrong
+      description: Use "wrong" to disagree with what someone else reported.
+      options:
+        - right — this is the correct value
+        - wrong — the current value is incorrect
+      default: 0
+    validations:
+      required: true
+
+  - type: input
+    id: value
+    attributes:
+      label: Correct value
+      description: >
+        yes/no for a bar or gentle entry; low/medium/high for crowds;
+        a number for position or facing direction; otherwise plain text.
+    validations:
+      required: true
+
+  - type: textarea
+    id: note
+    attributes:
+      label: Anything else
+      description: >
+        Which part of the beach, when you were there, anything that helps
+        someone else check it. No links, please.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmation
+      options:
+        - label: I've seen this myself, and I'm reporting what was true when I was there.
+          required: true

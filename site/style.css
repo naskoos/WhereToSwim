@@ -1145,6 +1145,26 @@ main {
 .prose + .prose { margin-top: 9px; }
 .prose.small { font-size: .81rem; color: var(--muted); }
 
+.claim-note { font-size: .82rem; color: var(--muted); }
+.detail-list em { font-style: normal; color: var(--bad); font-size: .82rem; display: block; margin-top: 3px; }
+
+.report-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: var(--sp-3);
+  padding: 9px 14px;
+  border-radius: var(--r-full);
+  border: 1px dashed var(--line-strong);
+  color: var(--brand-ink);
+  text-decoration: none;
+  font-size: .84rem;
+  font-weight: 650;
+}
+
+.report-link:hover { background: var(--brand-tint); border-style: solid; }
+.report-link svg { width: 15px; height: 15px; }
+
 .sheet-actions {
   display: grid;
   grid-template-columns: 1fr auto auto;

@@ -1,0 +1,50 @@
+name: Rebuild community beach data
+
+# Runs whenever a report is filed or edited, and nightly so that stale seasonal
+# claims and any maintainer vetoes are picked up even with no new activity.
+
+on:
+  issues:
+    types: [opened, edited, reopened, closed, labeled, unlabeled, deleted]
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: read
+
+concurrency:
+  group: community-data
+  cancel-in-progress: false
+
+jobs:
+  aggregate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/greece-beach-finder-app-qld1ee
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Aggregate reports into community.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python -u scripts/aggregate_community.py
+
+      - name: Keep the served copy in step
+        run: cp community.json site/community.json
+
+      - name: Commit if anything changed
+        run: |
+          git config user.name "community-data-bot"
+          git config user.email "actions@github.com"
+          if git diff --quiet community.json site/community.json; then
+            echo "No change to community data."
+            exit 0
+          fi
+          git add community.json site/community.json
+          git commit -m "Rebuild community beach data (run ${{ github.run_id }})"
+          git push origin claude/greece-beach-finder-app-qld1ee

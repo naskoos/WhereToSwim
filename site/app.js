@@ -85,6 +85,115 @@ const WIND_OPTIONS = [
   { value: 12, label: "Any",  note: "no limit" },
 ];
 
+/* -------------------------------------------------------------------------
+   Community data
+   -------------------------------------------------------------------------
+
+   Some facts about a beach keep. Where it is, which way it faces, whether the
+   shore is sand or shingle — report those once and they stay true.
+
+   Facilities do not keep. Beach bars in Greece open and close between seasons,
+   so "there was a bar here last August" is a claim about last August, not about
+   today. Seasonal claims therefore expire when a new swimming season starts and
+   have to be reconfirmed; until someone does, the app treats the field as
+   unknown rather than as fact, which after the previous fix is handled
+   gracefully instead of being scored as an absence.                          */
+
+const SEASONAL_FIELDS = new Set(["has_beach_bar", "bar_notes", "crowd_level"]);
+const SEASON_START_MONTH = 4; // May (0-indexed); the Greek swimming season.
+
+/** Claims confirmed before this date are last season's news. */
+function currentSeasonStart(now) {
+  const d = now || new Date();
+  const year = d.getMonth() >= SEASON_START_MONTH ? d.getFullYear() : d.getFullYear() - 1;
+  return new Date(year, SEASON_START_MONTH, 1);
+}
+
+function seasonLabel(dateStr) {
+  const d = new Date(dateStr);
+  if (isNaN(d)) return "unknown";
+  const year = d.getMonth() >= SEASON_START_MONTH ? d.getFullYear() : d.getFullYear() - 1;
+  return `summer ${year}`;
+}
+
+/**
+ * Weigh a single claim: how many people back it, how recently, and whether a
+ * seasonal fact has gone stale. Returns null when the claim shouldn't be
+ * applied at all.
+ */
+function assessClaim(field, claim, now) {
+  if (!claim || claim.value === undefined) return null;
+  const agree = Array.isArray(claim.agree) ? claim.agree : [];
+  const disagree = Array.isArray(claim.disagree) ? claim.disagree : [];
+  const net = agree.length - disagree.length;
+  if (net < 1) return null; // contested or unsupported — leave the field alone
+
+  const dates = agree.map((a) => new Date(a.at)).filter((d) => !isNaN(d));
+  const lastConfirmed = dates.length ? new Date(Math.max(...dates)) : null;
+  const seasonal = SEASONAL_FIELDS.has(field);
+  const stale = seasonal && (!lastConfirmed || lastConfirmed < currentSeasonStart(now));
+
+  return {
+    field,
+    value: claim.value,
+    note: claim.note || null,
+    agreeCount: agree.length,
+    disagreeCount: disagree.length,
+    net,
+    by: agree.map((a) => a.by).filter(Boolean),
+    lastConfirmed,
+    lastConfirmedLabel: lastConfirmed ? seasonLabel(lastConfirmed.toISOString()) : null,
+    seasonal,
+    stale,
+    confidence: net >= 3 ? "high" : net === 2 ? "medium" : "low",
+  };
+}
+
+/**
+ * Fold community claims into the shipped beach list, and append any community
+ * -contributed entries (a 3 km beach with three different ends can't be one
+ * point). Returns a new array; beaches.json itself is never mutated.
+ */
+function applyCommunityData(beaches, community, now) {
+  if (!community) return beaches;
+
+  const claimsById = community.claims || {};
+  const merged = beaches.map((b) => {
+    const claims = claimsById[b.id];
+    if (!claims) return b;
+
+    const copy = { ...b, community: {} };
+    for (const [field, claim] of Object.entries(claims)) {
+      const a = assessClaim(field, claim, now);
+      if (!a) continue;
+      copy.community[field] = a;
+      // A stale seasonal claim is recorded for display but not treated as fact.
+      if (!a.stale) copy[field] = a.value;
+    }
+    return copy;
+  });
+
+  for (const add of community.additions || []) {
+    if (!add || add.lat == null || add.lon == null || !add.id) continue;
+    if (merged.some((b) => b.id === add.id)) continue;
+    merged.push({
+      facing_deg: null, shelter_arc_deg: null,
+      toddler_friendly: null, crowd_level: null, has_beach_bar: false,
+      ...add,
+      source: "community",
+      community: {
+        _added: {
+          by: (add.reported || []).map((r) => r.by).filter(Boolean),
+          lastConfirmedLabel: (add.reported || []).length
+            ? seasonLabel(add.reported[add.reported.length - 1].at) : null,
+        },
+      },
+    });
+  }
+
+  return merged;
+}
+
 const STORE = {
   favorites: "wts:favorites",
   theme: "wts:theme",
@@ -113,9 +222,21 @@ const state = {
 };
 
 let allBeaches = null;
-const beachesPromise = fetch("beaches.json")
-  .then((r) => { if (!r.ok) throw new Error("beaches.json " + r.status); return r.json(); })
-  .then((data) => { allBeaches = data; return data; });
+let communityData = null;
+
+// The community layer is an optional overlay: if it fails to load, the app
+// still works off the shipped list rather than showing nothing.
+const beachesPromise = Promise.all([
+  fetch("beaches.json").then((r) => {
+    if (!r.ok) throw new Error("beaches.json " + r.status);
+    return r.json();
+  }),
+  fetch("community.json").then((r) => (r.ok ? r.json() : null)).catch(() => null),
+]).then(([base, community]) => {
+  communityData = community;
+  allBeaches = applyCommunityData(base, community);
+  return allBeaches;
+});
 
 /* -------------------------------------------------------------------------
    Small utilities
@@ -1181,6 +1302,72 @@ function toggleFavorite(id) {
    Detail sheet
    ------------------------------------------------------------------------- */
 
+const REPO_URL = "https://github.com/naskoos/WhereToSwim";
+
+/** Pre-fills the structured issue form so reporting is a couple of taps. */
+function reportUrl(beach) {
+  const params = new URLSearchParams({
+    labels: "beach-data",
+    template: "beach-data.yml",
+    title: `[data] ${beach.name}`,
+    beach_id: beach.id,
+    beach_name: beach.name,
+  });
+  return `${REPO_URL}/issues/new?${params}`;
+}
+
+const FIELD_LABELS = {
+  has_beach_bar: "Beach bar / facilities",
+  bar_notes: "Facilities detail",
+  crowd_level: "How busy it gets",
+  toddler_friendly: "Gentle entry for small children",
+  name: "Name",
+  lat: "Position", lon: "Position",
+  facing_deg: "Which way it faces",
+};
+
+function claimValueText(field, value) {
+  if (field === "has_beach_bar") return value ? "has a bar / facilities" : "no bar or facilities";
+  if (field === "toddler_friendly") return value ? "gentle entry" : "not a gentle entry";
+  if (field === "crowd_level") return `${value} crowds`;
+  return String(value);
+}
+
+/** Who said what, when — and whether a seasonal fact needs reconfirming. */
+function communitySection(beach) {
+  const c = beach.community;
+  if (!c || !Object.keys(c).length) return "";
+
+  const rows = [];
+
+  if (c._added) {
+    rows.push(`<li>${icon("check")}<span>Added by
+      <strong>${esc((c._added.by || []).join(", ") || "a contributor")}</strong>${
+        c._added.lastConfirmedLabel ? `, ${esc(c._added.lastConfirmedLabel)}` : ""}.</span></li>`);
+  }
+
+  for (const [field, a] of Object.entries(c)) {
+    if (field === "_added") continue;
+    const who = a.by.length ? a.by.join(", ") : "a contributor";
+    const backing = a.agreeCount > 1
+      ? `${a.agreeCount} people confirm` : "reported by";
+    rows.push(`<li class="${a.stale ? "dl-bad" : "dl-good"}">${icon(a.stale ? "alert" : "check")}<span>
+      <strong>${esc(FIELD_LABELS[field] || field)}:</strong> ${esc(claimValueText(field, a.value))} —
+      ${esc(backing)} <strong>${esc(who)}</strong>${a.lastConfirmedLabel ? `, ${esc(a.lastConfirmedLabel)}` : ""}${
+        a.disagreeCount ? ` (${a.disagreeCount} disagree)` : ""}.
+      ${a.stale ? `<em>Not confirmed this season, so the app is ignoring it — facilities change between summers.</em>` : ""}
+      ${a.note ? `<br><span class="claim-note">${esc(a.note)}</span>` : ""}
+    </span></li>`);
+  }
+
+  if (!rows.length) return "";
+
+  return `<div class="sheet-section">
+    <h3>Reported by people who've been</h3>
+    <ul class="detail-list">${rows.join("")}</ul>
+  </div>`;
+}
+
 let sheetOpenId = null;
 
 async function openSheet(id) {
@@ -1244,10 +1431,16 @@ async function openSheet(id) {
         <div id="sheet-timeline"><p class="prose small">Loading today's wind…</p></div>
       </div>
 
+      ${communitySection(b)}
+
       <div class="sheet-section">
         <h3>About this entry</h3>
         <p class="prose small">${esc(b.notes || "")}</p>
-        <p class="prose small">Coordinates ${r.lat.toFixed(5)}, ${r.lon.toFixed(5)}.</p>
+        <p class="prose small">Coordinates ${r.lat.toFixed(5)}, ${r.lon.toFixed(5)}${
+          b.coordinate_source ? ` (from the ${esc(b.coordinate_source)})` : ""}.</p>
+        <a class="report-link" href="${reportUrl(b)}" target="_blank" rel="noopener">
+          ${icon("info")} Something wrong or out of date? Report it
+        </a>
       </div>
     </div>
     <div class="sheet-actions">
