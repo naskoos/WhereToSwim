@@ -1,0 +1,28 @@
+name: Resolve a map link (manual)
+
+# Short map links only redirect; the coordinates are in the URL you land on.
+# The dev sandbox can't make outbound requests, so resolution happens here.
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Map link to resolve (goo.gl/maps, maps.app.goo.gl, google.com/maps, openstreetmap.org)"
+        required: true
+        type: string
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Follow the link
+        run: python -u scripts/resolve_map_link.py "${{ inputs.url }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: resolved-link
+          path: resolved_link.json
+          retention-days: 3
