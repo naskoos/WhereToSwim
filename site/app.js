@@ -10,6 +10,7 @@ const OSM_AMENITY_RADIUS_KM = 0.4;
 const OSM_MAX_RADIUS_KM = 40;
 const MAX_CANDIDATES_FOR_WEATHER = 30;
 const MIN_CURATED_BEFORE_SKIPPING_OSM = 8;
+const MAX_RESULTS_SHOWN = 20;
 const SAND_SURFACES = ["sand", "fine_sand", "sandy"];
 const ROUGH_SURFACES = ["pebblestone", "pebbles", "shingle", "rock", "rocks", "gravel", "stone"];
 
@@ -500,7 +501,7 @@ findBtn.addEventListener("click", async () => {
     const pool = relaxedFilters ? scored : strict;
     pool.sort((a, b) => b.score - a.score);
 
-    renderResults(pool.slice(0, 6), relaxedFilters);
+    renderResults(pool.slice(0, MAX_RESULTS_SHOWN), relaxedFilters);
   } catch (e) {
     resultsEl.innerHTML = `<p class="status-msg">Something went wrong fetching recommendations. Check your connection and try again.</p>`;
   } finally {

@@ -384,7 +384,7 @@ def api_recommend():
     want_bar = request.args.get("needs_bar", "true").lower() != "false"
     max_wave = float(request.args.get("max_wave", 0.3))
     max_beaufort = int(request.args.get("max_beaufort", 3))
-    max_results = int(request.args.get("max_results", 6))
+    max_results = int(request.args.get("max_results", 20))
 
     beaches = load_beaches()
     candidates = []
