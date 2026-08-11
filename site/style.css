@@ -1067,6 +1067,66 @@ main {
 .detail-list .dl-good svg { color: var(--good); }
 .detail-list .dl-bad svg { color: var(--bad); }
 
+/* Sea temperature evolution */
+.sea-now {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.sea-now-val {
+  font-size: 1.9rem;
+  font-weight: 700;
+  letter-spacing: -.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.sea-now-word {
+  font-size: .88rem;
+  font-weight: 650;
+  padding: 3px 10px;
+  border-radius: var(--r-full);
+  background: var(--surface-sunken);
+  color: var(--ink-2);
+}
+
+.sea-now-word.tone-good { background: var(--good-tint); color: var(--good); }
+.sea-now-word.tone-warn { background: var(--warn-tint); color: var(--warn); }
+.sea-now-word.tone-bad  { background: var(--bad-tint);  color: var(--bad); }
+
+.sea-chart-wrap {
+  margin: 6px 0 2px;
+  color: var(--brand);
+  overflow-x: auto;
+}
+
+.sea-chart {
+  display: block;
+  width: 100%;
+  min-width: 260px;
+  height: auto;
+}
+
+.sea-legend {
+  margin: 0;
+  font-size: .72rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.sea-trend {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  font-size: .86rem;
+  font-weight: 600;
+}
+
+.sea-trend.is-good { background: var(--good-tint); color: var(--good); }
+.sea-trend.is-warn { background: var(--warn-tint); color: var(--warn); }
+
 .prose { font-size: .89rem; color: var(--ink-2); line-height: 1.55; margin: 0; }
 .prose + .prose { margin-top: 9px; }
 .prose.small { font-size: .81rem; color: var(--muted); }

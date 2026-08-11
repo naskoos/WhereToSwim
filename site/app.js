@@ -316,6 +316,161 @@ async function fetchAreaTimeline(lat, lon, withDaylight) {
   }
 }
 
+/**
+ * Sea temperature for the past week plus the next few days.
+ *
+ * This matters more in Greece than the raw number does: a few days of strong
+ * meltemi drives upwelling that can pull the sea down several degrees almost
+ * overnight, so "26°C" and "26°C, down from 29°C on Tuesday" mean quite
+ * different things when you're deciding whether to take a toddler in.
+ */
+async function fetchSeaHistory(lat, lon) {
+  const url = `${MARINE_URL}?latitude=${lat}&longitude=${lon}` +
+    `&hourly=sea_surface_temperature&past_days=7&forecast_days=3&timezone=auto`;
+  try {
+    const data = await getJSON(url, 12000);
+    const entry = asArray(data)[0];
+    const hourly = entry && entry.hourly;
+    if (!hourly || !hourly.time || !hourly.sea_surface_temperature) return null;
+
+    // Collapse hourly readings into daily means; the hour-to-hour wobble is
+    // noise at this scale and the daily shape is what tells the story.
+    const byDay = new Map();
+    hourly.time.forEach((t, i) => {
+      const v = hourly.sea_surface_temperature[i];
+      if (v == null) return;
+      const day = t.slice(0, 10);
+      if (!byDay.has(day)) byDay.set(day, []);
+      byDay.get(day).push(v);
+    });
+
+    const today = new Date().toISOString().slice(0, 10);
+    const days = [...byDay.entries()]
+      .map(([day, vals]) => ({
+        day,
+        mean: vals.reduce((s, v) => s + v, 0) / vals.length,
+        min: Math.min(...vals),
+        max: Math.max(...vals),
+        isFuture: day > today,
+        isToday: day === today,
+      }))
+      .sort((a, b) => (a.day < b.day ? -1 : 1));
+
+    return days.length >= 3 ? days : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/** Turn the curve into the sentence a swimmer actually wants. */
+function seaTrendNote(days) {
+  if (!days || days.length < 3) return null;
+  const todayIdx = days.findIndex((d) => d.isToday);
+  const now = todayIdx >= 0 ? days[todayIdx] : days[days.length - 1];
+  const past = days.filter((d) => !d.isFuture);
+  if (past.length < 2) return null;
+
+  const weekAgo = past[0];
+  const change = now.mean - weekAgo.mean;
+
+  // A sharp recent drop is the upwelling signature and worth calling out.
+  let sharpest = null;
+  for (let i = 1; i < past.length; i++) {
+    const delta = past[i].mean - past[i - 1].mean;
+    if (sharpest == null || delta < sharpest.delta) sharpest = { delta, day: past[i].day };
+  }
+
+  const future = days.filter((d) => d.isFuture);
+  const ahead = future.length ? future[future.length - 1].mean - now.mean : null;
+
+  let text, tone;
+  if (sharpest && sharpest.delta <= -1.5) {
+    text = `Dropped ${Math.abs(sharpest.delta).toFixed(1)}°C in a day — typical after strong north winds push warm surface water offshore.`;
+    tone = "warn";
+  } else if (change >= 1) {
+    text = `Warmed ${change.toFixed(1)}°C over the past week.`;
+    tone = "good";
+  } else if (change <= -1) {
+    text = `Cooled ${Math.abs(change).toFixed(1)}°C over the past week.`;
+    tone = "warn";
+  } else {
+    text = `Steady over the past week (${change >= 0 ? "+" : ""}${change.toFixed(1)}°C).`;
+    tone = "good";
+  }
+
+  if (ahead != null && Math.abs(ahead) >= 0.8) {
+    text += ` Forecast to ${ahead > 0 ? "rise" : "fall"} about ${Math.abs(ahead).toFixed(1)}°C over the next few days.`;
+  }
+
+  return { text, tone };
+}
+
+/** Inline SVG line chart — no libraries, and it inherits the theme. */
+function seaChartSVG(days) {
+  const W = 320, H = 108, padL = 26, padR = 8, padT = 10, padB = 20;
+  const temps = days.flatMap((d) => [d.min, d.max]);
+  let lo = Math.min(...temps), hi = Math.max(...temps);
+  if (hi - lo < 1.5) { const mid = (hi + lo) / 2; lo = mid - 0.75; hi = mid + 0.75; }
+  lo = Math.floor(lo * 2) / 2;
+  hi = Math.ceil(hi * 2) / 2;
+
+  const x = (i) => padL + (i / Math.max(1, days.length - 1)) * (W - padL - padR);
+  const y = (v) => padT + (1 - (v - lo) / (hi - lo)) * (H - padT - padB);
+
+  const pastDays = days.filter((d) => !d.isFuture);
+  const splitIdx = Math.max(0, pastDays.length - 1);
+
+  const linePts = (from, to) =>
+    days.slice(from, to).map((d, k) => `${x(from + k).toFixed(1)},${y(d.mean).toFixed(1)}`).join(" ");
+
+  const areaPath =
+    `M ${x(0).toFixed(1)},${y(days[0].mean).toFixed(1)} ` +
+    days.map((d, i) => `L ${x(i).toFixed(1)},${y(d.mean).toFixed(1)}`).join(" ") +
+    ` L ${x(days.length - 1).toFixed(1)},${(H - padB).toFixed(1)} L ${x(0).toFixed(1)},${(H - padB).toFixed(1)} Z`;
+
+  const gridVals = [lo, (lo + hi) / 2, hi];
+  const grid = gridVals.map((v) =>
+    `<line x1="${padL}" y1="${y(v).toFixed(1)}" x2="${W - padR}" y2="${y(v).toFixed(1)}"
+       stroke="currentColor" stroke-opacity=".12" stroke-width="1"/>
+     <text x="${padL - 5}" y="${(y(v) + 3.5).toFixed(1)}" text-anchor="end"
+       font-size="8.5" fill="currentColor" fill-opacity=".55">${v.toFixed(1)}</text>`).join("");
+
+  const todayIdx = days.findIndex((d) => d.isToday);
+  const marker = todayIdx >= 0 ? `
+    <line x1="${x(todayIdx).toFixed(1)}" y1="${padT}" x2="${x(todayIdx).toFixed(1)}" y2="${H - padB}"
+      stroke="currentColor" stroke-opacity=".28" stroke-width="1" stroke-dasharray="2 2"/>
+    <circle cx="${x(todayIdx).toFixed(1)}" cy="${y(days[todayIdx].mean).toFixed(1)}" r="3.6"
+      fill="var(--surface)" stroke="currentColor" stroke-width="2.2"/>` : "";
+
+  const labels = days.map((d, i) => {
+    if (i !== 0 && i !== days.length - 1 && !d.isToday) return "";
+    const date = new Date(d.day + "T12:00:00");
+    const txt = d.isToday ? "today" : date.toLocaleDateString([], { day: "numeric", month: "short" });
+    const anchor = i === 0 ? "start" : i === days.length - 1 ? "end" : "middle";
+    return `<text x="${x(i).toFixed(1)}" y="${H - 6}" text-anchor="${anchor}"
+      font-size="8.5" fill="currentColor" fill-opacity=".55">${txt}</text>`;
+  }).join("");
+
+  return `<svg class="sea-chart" viewBox="0 0 ${W} ${H}" role="img"
+    aria-label="Sea temperature from ${days[0].day} to ${days[days.length - 1].day}">
+    <defs>
+      <linearGradient id="seaFill" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="currentColor" stop-opacity=".22"/>
+        <stop offset="1" stop-color="currentColor" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    ${grid}
+    <path d="${areaPath}" fill="url(#seaFill)"/>
+    ${marker}
+    <polyline points="${linePts(0, splitIdx + 1)}" fill="none" stroke="currentColor"
+      stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    ${splitIdx < days.length - 1 ? `<polyline points="${linePts(splitIdx, days.length)}" fill="none"
+      stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
+      stroke-dasharray="3 3" stroke-opacity=".65"/>` : ""}
+    ${labels}
+  </svg>`;
+}
+
 /** "2h 40m of daylight left" / "sunrise 06:42" — matters for an evening swim. */
 function daylightNote(tl) {
   if (!tl || !tl.sunset || !tl.sunset.length) return null;
@@ -994,6 +1149,11 @@ async function openSheet(id) {
       </div>
 
       <div class="sheet-section">
+        <h3>Sea temperature</h3>
+        <div id="sheet-sea"><p class="prose small">Loading the past week…</p></div>
+      </div>
+
+      <div class="sheet-section">
         <h3>Timing</h3>
         <div id="sheet-timeline"><p class="prose small">Loading today's wind…</p></div>
       </div>
@@ -1022,8 +1182,32 @@ async function openSheet(id) {
   $("sheet-fav").addEventListener("click", () => toggleFavorite(r.id));
   $("sheet-share").addEventListener("click", () => shareBeach(r));
 
-  // Per-beach hourly wind, so you can pick your hour for this exact spot.
-  const tl = await fetchAreaTimeline(r.lat, r.lon);
+  // Sea-temperature evolution and the hourly wind for this exact spot, in
+  // parallel — both are secondary to what's already on screen.
+  const [seaDays, tl] = await Promise.all([
+    fetchSeaHistory(r.lat, r.lon),
+    fetchAreaTimeline(r.lat, r.lon),
+  ]);
+
+  const seaHolder = $("sheet-sea");
+  if (seaHolder && sheetOpenId === id) {
+    if (!seaDays) {
+      seaHolder.innerHTML = `<p class="prose small">No sea-temperature record for this spot — the marine model doesn't cover every enclosed bay.</p>`;
+    } else {
+      const trend = seaTrendNote(seaDays);
+      const nowDay = seaDays.find((d) => d.isToday) || seaDays[seaDays.length - 1];
+      const desc = seaTempDescriptor(nowDay.mean);
+      seaHolder.innerHTML = `
+        <div class="sea-now">
+          <span class="sea-now-val">${nowDay.mean.toFixed(1)}°C</span>
+          ${desc ? `<span class="sea-now-word tone-${desc.tone}">${esc(desc.word)}</span>` : ""}
+        </div>
+        <div class="sea-chart-wrap">${seaChartSVG(seaDays)}</div>
+        <p class="sea-legend">Daily average · solid line is what happened, dashed is forecast</p>
+        ${trend ? `<p class="prose sea-trend is-${trend.tone}">${esc(trend.text)}</p>` : ""}`;
+    }
+  }
+
   const holder = $("sheet-timeline");
   if (!holder || sheetOpenId !== id) return;
   const analysis = analyseTimeline(tl);

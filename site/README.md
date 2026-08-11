@@ -14,6 +14,7 @@ swim is a good idea:
 | **Waves** | Live wave height from the marine model, adjusted for whether the beach faces into today's wind |
 | **Wind** | Beaufort force, speed, direction and gusts |
 | **Sea temperature** | With a plain-language read ("bracing", "pleasant", "bath-warm") |
+| **Sea temperature trend** | A chart of the past week plus the next three days, so you can see whether the water is warming, cooling, or has just been flushed cold by a meltemi |
 | **UV index** | With shade/sunscreen advice — it gets extreme here in summer |
 | **Calmest window today** | An hourly wind timeline, so you can dodge the afternoon meltemi |
 | **Daylight left** | Time until sunset, for an evening swim |
@@ -63,7 +64,8 @@ You can still fine-tune the exact thresholds if you want them.
 
 - Wave data comes from a coarse ocean model. Small enclosed bays often have no
   wave figure at all, and the app falls back to a wind-based estimate and says
-  so.
+  so. The same coarseness applies to sea temperature: the trend chart shows a
+  regional model value, not a thermometer in that particular cove.
 - "Sheltered from today's wind" is only known for the 61 hand-checked beaches,
   which have an authored facing direction and shelter arc. Everywhere else the
   app says shelter is unknown rather than guessing.
