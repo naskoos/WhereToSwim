@@ -1,0 +1,48 @@
+name: Reverse Geocode Unnamed Beaches (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: "Geocode all candidates, or only unnamed ones"
+        required: false
+        default: "unnamed"
+        type: choice
+        options:
+          - unnamed
+          - all
+
+permissions:
+  contents: write
+
+jobs:
+  geocode:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Pull input data from osm-bulk-review branch
+        run: git show origin/osm-bulk-review:osm_bulk_beaches.json > osm_bulk_beaches.json
+      - name: Run reverse geocoding
+        run: |
+          FLAG=""
+          if [ "${{ inputs.scope }}" = "all" ]; then FLAG="--all"; fi
+          python -u scripts/reverse_geocode.py $FLAG
+      - uses: actions/upload-artifact@v4
+        with:
+          name: geocode-results-${{ inputs.scope }}
+          path: geocode_results.json
+          retention-days: 7
+      - name: Commit result to osm-bulk-review branch
+        run: |
+          git config user.name "geocode-bot"
+          git config user.email "actions@github.com"
+          rm -f osm_bulk_beaches.json  # avoid conflicting with the tracked copy on osm-bulk-review
+          git checkout osm-bulk-review
+          git add -f geocode_results.json
+          git commit -m "Reverse geocode results (scope=${{ inputs.scope }}, run ${{ github.run_id }})" || echo "nothing to commit"
+          git push origin osm-bulk-review
