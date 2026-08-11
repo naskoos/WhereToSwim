@@ -34,11 +34,11 @@
     {
       "id": "community_kakoudia_east",
       "parent": "osm_way_363019603",
-      "name": "Κακούδια – ανατολικό άκρο (Kakoudia, east end)",
+      "name": "Κακούδια – άκρο (Kakoudia, far end)",
       "area": "Ierissos / Chalkidiki",
-      "lat": 40.429,
-      "lon": 23.851,
-      "coordinate_source": "reporter's device",
+      "lat": 40.429569,
+      "lon": 23.849819,
+      "coordinate_source": "map pin shared by the reporter",
       "has_beach_bar": true,
       "bar_notes": "Beach bar reported here in summer 2026.",
       "toddler_friendly": null,
@@ -46,7 +46,7 @@
       "crowd_level": null,
       "facing_deg": null,
       "shelter_arc_deg": null,
-      "notes": "Kakoudia runs about 3 km and has three distinct areas with different facilities; a single mapped point can't represent all of them. This entry covers the far end where the reporter was standing.",
+      "notes": "Kakoudia runs about 3 km in three distinct areas with different facilities, so one mapped point can't stand for all of them. This entry is the section at the pin the reporter shared while there. Worth checking: OpenStreetMap's Kakoudia way (363019603) covers 2.68 km of shore running NW-SE, and this pin sits 1.7 km beyond its north-west end — so either the beach extends further than OSM maps it, or this stretch is known locally under another name.",
       "reported": [
         {
           "by": "naskoos",
