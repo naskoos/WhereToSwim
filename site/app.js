@@ -29,7 +29,13 @@ const SAND_SURFACES = ["sand", "fine_sand", "sandy"];
 const ROUGH_SURFACES = ["pebblestone", "pebbles", "shingle", "rock", "rocks", "gravel", "stone"];
 
 const COMPASS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
-const CROWD_PENALTY = { low: 0, medium: 8, high: 18 };
+const CROWD_PENALTY = { low: 0, medium: 6, high: 14 };
+const CROWD_PENALTY_UNKNOWN = 2;
+
+// Distance is scored against the radius you asked for: a beach at the far edge
+// of your search loses this much, one you're standing on loses nothing. A flat
+// per-km penalty made proximity almost irrelevant next to the amenity bonuses.
+const DISTANCE_PENALTY_AT_EDGE = 30;
 
 const BEAUFORT = [
   { max: 1,   num: 0,  label: "Calm" },
@@ -623,6 +629,26 @@ async function fetchOsmBeaches(lat, lon, radiusKm, curated) {
    Scoring
    ------------------------------------------------------------------------- */
 
+/**
+ * Whether a beach has food/toilets nearby: "yes", "no", or "unknown".
+ *
+ * This distinction matters. Only the hand-checked beaches were actually looked
+ * at, so for them `false` really does mean nothing there. For an OSM entry it
+ * only means nothing is *mapped* within 400 m, which is common for quiet
+ * beaches that do in fact have a canteen. Scoring those two the same buried
+ * every sparsely-tagged beach beneath the curated ones.
+ */
+function amenityState(beach) {
+  if (beach.has_beach_bar) return "yes";
+  return (beach.source || "curated") === "curated" ? "no" : "unknown";
+}
+
+function shallowState(beach) {
+  if (beach.toddler_friendly === true) return "yes";
+  if (beach.toddler_friendly === false) return "no";
+  return "unknown";
+}
+
 function activeLimits() {
   const p = PROFILES[state.profile];
   return {
@@ -659,13 +685,22 @@ function scoreBeach(beach, distanceKm, cond) {
   const passesComfort = passesWave && passesWind;
   const comfortUnknown = waveHeight == null && beaufort == null;
 
+  // Reward what's known to be good and penalise what's known to be bad, but
+  // stay neutral on what simply isn't recorded — otherwise a thinly-tagged
+  // beach loses to a well-documented one on paperwork rather than on merit.
+  const shallow = shallowState(beach);
+  const amenity = amenityState(beach);
+
   let score = calmness;
-  if (beach.toddler_friendly === true) score += 10;
-  else if (beach.toddler_friendly === false && lim.needsShallow) score -= 25;
-  if (beach.has_beach_bar) score += 10;
-  else if (lim.wantsAmenities) score -= 20;
-  score -= CROWD_PENALTY[beach.crowd_level] ?? 5;
-  score -= distanceKm * 0.3;
+  if (shallow === "yes") score += 8;
+  else if (shallow === "no" && lim.needsShallow) score -= 25;
+
+  if (amenity === "yes") score += 8;
+  else if (amenity === "no" && lim.wantsAmenities) score -= 14;
+
+  score -= beach.crowd_level ? (CROWD_PENALTY[beach.crowd_level] ?? 0) : CROWD_PENALTY_UNKNOWN;
+  score -= Math.min(DISTANCE_PENALTY_AT_EDGE,
+                    (distanceKm / Math.max(1, state.radiusKm)) * DISTANCE_PENALTY_AT_EDGE);
   if (!passesComfort) score -= 40;
   if (state.favorites.has(beach.id)) score += 6;
 
@@ -686,6 +721,8 @@ function scoreBeach(beach, distanceKm, cond) {
     passesWave, passesWind, passesComfort, comfortUnknown,
     toddlerFriendly: beach.toddler_friendly,
     hasBar: beach.has_beach_bar,
+    amenity,
+    shallow,
     crowd: beach.crowd_level,
     surface: beach.surface || null,
     source: beach.source || "curated",
@@ -893,10 +930,15 @@ function shortLabel(label) {
    Rendering — results
    ------------------------------------------------------------------------- */
 
+// `unknownAsMiss` marks filters that hide beaches purely for missing data, so
+// the results can say how many were dropped that way rather than pretending
+// they don't exist.
 const FILTERS = [
   { key: "calm",     label: "Calm now",     icon: "wave",  test: (r) => r.passesComfort },
-  { key: "shallow",  label: "Kid-friendly", icon: "child", test: (r) => r.toddlerFriendly === true },
-  { key: "bar",      label: "Bar / toilet", icon: "umbrella", test: (r) => r.hasBar },
+  { key: "shallow",  label: "Kid-friendly", icon: "child", test: (r) => r.shallow === "yes",
+    unknownAsMiss: (r) => r.shallow === "unknown" },
+  { key: "bar",      label: "Bar / toilet", icon: "umbrella", test: (r) => r.amenity === "yes",
+    unknownAsMiss: (r) => r.amenity === "unknown" },
   { key: "warm",     label: "Warm sea",     icon: "thermo", test: (r) => r.seaTemp != null && r.seaTemp >= 24 },
   { key: "fav",      label: "Saved",        icon: "heart", test: (r) => state.favorites.has(r.id) },
 ];
@@ -928,6 +970,25 @@ function renderToolbar() {
   });
 
   bar.classList.remove("hidden");
+}
+
+/** How many beaches an active filter drops only because the data is missing. */
+function countHiddenForMissingData(list) {
+  const active = [...state.filters]
+    .map((k) => FILTERS.find((x) => x.key === k))
+    .filter((f) => f && f.unknownAsMiss);
+  if (!active.length) return 0;
+
+  return list.filter((r) => {
+    // Ignore anything that would fail a filter on its merits anyway.
+    const failsOnMerit = [...state.filters].some((k) => {
+      const f = FILTERS.find((x) => x.key === k);
+      if (!f) return false;
+      return !f.test(r) && !(f.unknownAsMiss && f.unknownAsMiss(r));
+    });
+    if (failsOnMerit) return false;
+    return active.some((f) => f.unknownAsMiss(r));
+  }).length;
 }
 
 function applyFiltersAndSort(list) {
@@ -970,11 +1031,15 @@ function beachCard(r, index) {
   const uvd = uvDescriptor(r.uv);
 
   const tags = [];
-  if (r.toddlerFriendly === true) tags.push(`<span class="tag good">${icon("child")}Gentle entry</span>`);
-  else if (r.toddlerFriendly === false) tags.push(`<span class="tag warn">${icon("alert")}${esc((r.surface || "rough").replace(/_/g," "))}</span>`);
-  if (r.hasBar) tags.push(`<span class="tag good">${icon("umbrella")}Bar / toilet</span>`);
+  if (r.shallow === "yes") tags.push(`<span class="tag good">${icon("child")}Gentle entry</span>`);
+  else if (r.shallow === "no") tags.push(`<span class="tag warn">${icon("alert")}${esc((r.surface || "rough").replace(/_/g," "))}</span>`);
+  if (r.amenity === "yes") tags.push(`<span class="tag good">${icon("umbrella")}Bar / toilet</span>`);
+  else if (r.amenity === "unknown") tags.push(`<span class="tag ghost">${icon("umbrella")}Facilities unmapped</span>`);
   if (r.crowd) tags.push(`<span class="tag ${r.crowd === "low" ? "good" : r.crowd === "high" ? "warn" : ""}">${esc(r.crowd)} crowds</span>`);
   if (r.exposed === false) tags.push(`<span class="tag good">${icon("wind")}Sheltered today</span>`);
+  // The beach you're standing on should be findable even when better-documented
+  // ones outrank it, since it can't earn shelter/surface bonuses nobody recorded.
+  if (r.isNearest) tags.push(`<span class="tag">${icon("pin")}Nearest to you</span>`);
   // 61 of ~2,700 entries are hand-verified, so badge those rather than
   // stamping "community-mapped" on almost every card.
   if (r.source === "curated") tags.push(`<span class="tag">${icon("check")}Hand-checked</span>`);
@@ -1049,11 +1114,30 @@ function renderResults() {
     return;
   }
 
-  const notice = state.usedFallbackRadius
-    ? `<div class="notice">${icon("info")}<div>No beach fell inside your radius, so these are the closest ones we know of.</div></div>`
-    : "";
+  const notices = [];
+  if (state.usedFallbackRadius) {
+    notices.push(`<div class="notice">${icon("info")}<div>No beach fell inside your radius, so these are the closest ones we know of.</div></div>`);
+  }
 
-  el.innerHTML = notice + shown.map(beachCard).join("");
+  const hidden = countHiddenForMissingData(state.results);
+  if (hidden) {
+    notices.push(`<div class="notice">${icon("info")}<div>
+      <strong>${hidden} nearby beach${hidden === 1 ? "" : "es"} hidden</strong> — not because they lack facilities,
+      but because nobody has mapped them. Unmapped doesn't mean absent, especially at quieter beaches.
+      <button type="button" class="notice-action" id="drop-data-filters">Show them anyway</button>
+    </div></div>`);
+  }
+
+  el.innerHTML = notices.join("") + shown.map(beachCard).join("");
+
+  const dropBtn = $("drop-data-filters");
+  if (dropBtn) {
+    dropBtn.addEventListener("click", () => {
+      FILTERS.filter((f) => f.unknownAsMiss).forEach((f) => state.filters.delete(f.key));
+      renderToolbar();
+      renderResults();
+    });
+  }
 
   el.querySelectorAll(".beach-card").forEach((card) => {
     card.addEventListener("click", (e) => {
@@ -1074,12 +1158,14 @@ function renderResults() {
 }
 
 function rescoreExisting() {
-  state.results = state.results.map((r) =>
-    scoreBeach(r.beach, r.distanceKm, {
+  state.results = state.results.map((r) => {
+    const next = scoreBeach(r.beach, r.distanceKm, {
       windSpeed: r.windSpeed, windDir: r.windDir, windGust: r.windGust,
       waveHeight: r.waveHeight, seaTemp: r.seaTemp, uv: r.uv, airTemp: r.airTemp,
-    })
-  );
+    });
+    next.isNearest = r.isNearest;
+    return next;
+  });
 }
 
 function toggleFavorite(id) {
@@ -1359,6 +1445,10 @@ async function runSearch() {
 
     state.results = candidates.map((c) => scoreBeach(c.beach, c.distance, condById[c.beach.id]));
     state.areaTimeline = analyseTimeline(timeline);
+
+    const nearest = state.results.reduce(
+      (best, r) => (best == null || r.distanceKm < best.distanceKm ? r : best), null);
+    if (nearest) nearest.isNearest = true;
 
     const sample = state.results.find((r) => r.seaTemp != null) || state.results[0] || null;
     renderAreaPanel(state.areaTimeline, sample, timeline);

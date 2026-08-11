@@ -976,6 +976,20 @@ main {
 
 .notice svg { width: 17px; height: 17px; flex: none; margin-top: 1px; }
 
+.notice-action {
+  display: inline-block;
+  margin-top: 7px;
+  padding: 5px 12px;
+  border-radius: var(--r-full);
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  font-size: .8rem;
+  font-weight: 700;
+}
+
+.notice-action:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
+
 /* --------------------------------------------------------------------------
    Detail sheet
    -------------------------------------------------------------------------- */
