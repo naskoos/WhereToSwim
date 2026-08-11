@@ -44,11 +44,15 @@ def reverse_geocode(lat, lon, retries=2):
 
 def main():
     only_unnamed = "--all" not in sys.argv
+    regions_arg = next((a for a in sys.argv if a.startswith("--regions=")), None)
 
     with open("osm_bulk_beaches.json", encoding="utf-8") as f:
         candidates = json.load(f)
 
-    if only_unnamed:
+    if regions_arg:
+        wanted = {r.strip() for r in regions_arg[len("--regions="):].split(",") if r.strip()}
+        candidates = [c for c in candidates if c.get("region") in wanted]
+    elif only_unnamed:
         candidates = [c for c in candidates if c["name"].startswith("Unnamed")]
 
     print(f"Reverse-geocoding {len(candidates)} points (rate-limited to ~1/sec, so this will take a while)...", flush=True)

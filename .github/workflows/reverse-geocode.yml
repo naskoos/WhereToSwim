@@ -4,13 +4,18 @@ on:
   workflow_dispatch:
     inputs:
       scope:
-        description: "Geocode all candidates, or only unnamed ones"
+        description: "Geocode all candidates, only unnamed ones, or only unnamed but restricted to --regions"
         required: false
         default: "unnamed"
         type: choice
         options:
           - unnamed
           - all
+      regions:
+        description: "Comma-separated region names to restrict to (any named+unnamed points in these regions, overrides scope)"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: write
@@ -31,6 +36,7 @@ jobs:
         run: |
           FLAG=""
           if [ "${{ inputs.scope }}" = "all" ]; then FLAG="--all"; fi
+          if [ -n "${{ inputs.regions }}" ]; then FLAG="--regions=${{ inputs.regions }}"; fi
           python -u scripts/reverse_geocode.py $FLAG
       - uses: actions/upload-artifact@v4
         with:
