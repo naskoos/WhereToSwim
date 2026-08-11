@@ -167,20 +167,19 @@ button { cursor: pointer; }
    -------------------------------------------------------------------------- */
 
 .appbar {
-  position: sticky;
-  top: 0;
-  z-index: 40;
+  /* Deliberately not sticky. Two stacked sticky bars need the second one
+     offset by the exact height of the first, and that offset drifts the
+     moment a mobile browser collapses its URL bar — leaving a gap with
+     content scrolling through it. The filter toolbar is what you need while
+     scrolling results, so that pins alone and the title scrolls away. */
+  position: relative;
+  z-index: 20;
   backdrop-filter: saturate(160%) blur(14px);
   -webkit-backdrop-filter: saturate(160%) blur(14px);
   background: color-mix(in srgb, var(--bg) 90%, transparent);
   border-bottom: 1px solid transparent;
   transition: border-color .2s var(--ease), background .2s var(--ease);
   padding-top: env(safe-area-inset-top);
-}
-
-.appbar.is-stuck {
-  border-bottom-color: var(--line);
-  background: var(--bg);
 }
 
 .appbar-inner {
@@ -652,10 +651,10 @@ main {
 
 .toolbar {
   position: sticky;
-  top: calc(env(safe-area-inset-top) + 58px);
-  z-index: 30;
+  top: 0;
+  z-index: 40;
   margin: 0 calc(-1 * var(--sp-4)) var(--sp-4);
-  padding: var(--sp-3) var(--sp-4) var(--sp-2);
+  padding: calc(env(safe-area-inset-top) + var(--sp-3)) var(--sp-4) var(--sp-2);
   background: var(--bg);
   box-shadow: 0 6px 14px -10px rgba(11, 40, 55, .5);
 }
@@ -1148,6 +1147,37 @@ main {
 .claim-note { font-size: .82rem; color: var(--muted); }
 .detail-list em { font-style: normal; color: var(--bad); font-size: .82rem; display: block; margin-top: 3px; }
 
+.know-prompt {
+  display: flex;
+  gap: 10px;
+  margin-top: var(--sp-3);
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--brand-tint);
+  color: var(--brand-ink);
+}
+
+.know-prompt > svg { width: 17px; height: 17px; flex: none; margin-top: 2px; }
+.know-prompt strong { display: block; font-size: .9rem; }
+.know-prompt span { display: block; font-size: .82rem; color: var(--ink-2); margin-top: 2px; }
+
+.know-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  padding: 8px 14px;
+  border-radius: var(--r-full);
+  background: var(--brand);
+  color: var(--brand-contrast);
+  text-decoration: none;
+  font-size: .84rem;
+  font-weight: 700;
+}
+
+.know-cta svg { width: 14px; height: 14px; }
+.know-cta:hover { background: var(--brand-ink); }
+
 .report-link {
   display: inline-flex;
   align-items: center;
@@ -1167,8 +1197,8 @@ main {
 
 .sheet-actions {
   display: grid;
-  grid-template-columns: 1fr auto auto auto;
-  gap: var(--sp-2);
+  grid-template-columns: 1fr 1fr auto auto;
+  gap: 6px;
   padding: var(--sp-3) var(--sp-4);
   padding-bottom: calc(var(--sp-3) + env(safe-area-inset-bottom));
   border-top: 1px solid var(--line);
@@ -1181,16 +1211,21 @@ main {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 12px 16px;
+  padding: 12px 10px;
   border-radius: var(--r-md);
   border: 1px solid var(--line-strong);
   background: var(--surface-2);
-  font-size: .92rem;
+  font-size: .88rem;
   font-weight: 650;
   color: var(--ink);
   text-decoration: none;
+  white-space: nowrap;
+  min-width: 0;
   transition: background .15s var(--ease), transform .1s var(--ease);
 }
+
+#sheet-edit { color: var(--brand-ink); border-color: var(--brand); background: var(--brand-tint); }
+#sheet-edit:hover { background: color-mix(in srgb, var(--brand) 20%, var(--surface)); }
 
 .btn-action:active { transform: scale(.97); }
 .btn-action svg { width: 17px; height: 17px; }

@@ -1333,6 +1333,42 @@ function claimValueText(field, value) {
   return String(value);
 }
 
+/**
+ * Ask for what's actually missing, next to the gap itself.
+ *
+ * A pencil in a toolbar reads as "report a bug in the app". Naming the specific
+ * unknown — and saying plainly that nobody has recorded it — makes it obvious
+ * this is asking for local knowledge, not defect reports.
+ */
+function localKnowledgePrompt(beach, scored) {
+  const gaps = [];
+  const staleFields = Object.entries(beach.community || {})
+    .filter(([f, a]) => f !== "_added" && a.stale)
+    .map(([f]) => FIELD_LABELS[f] || f);
+
+  if (scored.amenity === "unknown") gaps.push("whether there's a beach bar or toilets");
+  if (scored.shallow === "unknown") gaps.push("whether the entry is sandy and shallow");
+  if (!beach.crowd_level) gaps.push("how busy it usually gets");
+
+  if (!gaps.length && !staleFields.length) return "";
+
+  const lead = staleFields.length
+    ? `Last confirmed a season or more ago: <strong>${esc(staleFields.join(", ").toLowerCase())}</strong>.
+       Bars come and go between summers, so it needs confirming again.`
+    : `Nobody has recorded ${esc(gaps.slice(0, 2).join(", or "))}${gaps.length > 2 ? ", among other things" : ""}.`;
+
+  return `<div class="know-prompt">
+    ${icon("info")}
+    <div>
+      <strong>Been here? Fill in what you know.</strong>
+      <span>${lead}</span>
+      <a class="know-cta" href="${reportUrl(beach)}" target="_blank" rel="noopener">
+        ${icon("edit")} Add what's here
+      </a>
+    </div>
+  </div>`;
+}
+
 /** Who said what, when — and whether a seasonal fact needs reconfirming. */
 function communitySection(beach) {
   const c = beach.community;
@@ -1419,6 +1455,7 @@ async function openSheet(id) {
         <p class="prose">${esc(b.bar_notes || "")}</p>
         ${b.crowd_level ? `<p class="prose">Typically <strong>${esc(b.crowd_level)}</strong> crowds.</p>`
           : `<p class="prose small">Crowd level isn't recorded for this beach.</p>`}
+        ${localKnowledgePrompt(b, r)}
       </div>
 
       <div class="sheet-section">
@@ -1439,15 +1476,15 @@ async function openSheet(id) {
         <p class="prose small">Coordinates ${r.lat.toFixed(5)}, ${r.lon.toFixed(5)}${
           b.coordinate_source ? ` (from the ${esc(b.coordinate_source)})` : ""}.</p>
         <a class="report-link" href="${reportUrl(b)}" target="_blank" rel="noopener">
-          ${icon("info")} Something wrong or out of date? Report it
+          ${icon("edit")} You know this beach better than the map does — tell us
         </a>
       </div>
     </div>
     <div class="sheet-actions">
       <a class="btn-action primary" href="${r.mapsUrl}" target="_blank" rel="noopener">${icon("route")} Directions</a>
-      <a class="btn-action icon-only" href="${reportUrl(b)}" target="_blank" rel="noopener"
-         id="sheet-edit" aria-label="Correct this beach's details"
-         title="Something wrong or out of date? Correct it">${icon("edit")}</a>
+      <a class="btn-action" href="${reportUrl(b)}" target="_blank" rel="noopener"
+         id="sheet-edit" aria-label="Add or correct information about this beach">
+         ${icon("edit")} <span>Add info</span></a>
       <button class="btn-action icon-only" type="button" id="sheet-fav" aria-label="Save"
               style="${fav ? "color:var(--bad)" : ""}">${icon("heart")}</button>
       <button class="btn-action icon-only" type="button" id="sheet-share" aria-label="Share">${icon("share")}</button>
@@ -1794,10 +1831,6 @@ function wireMisc() {
     $("advanced-controls").classList.toggle("hidden", open);
   });
 
-  const appbar = $("appbar");
-  const onScroll = () => appbar.classList.toggle("is-stuck", window.scrollY > 6);
-  window.addEventListener("scroll", onScroll, { passive: true });
-  onScroll();
 }
 
 function restorePreferences() {
