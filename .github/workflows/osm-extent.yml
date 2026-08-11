@@ -1,0 +1,29 @@
+name: Inspect OSM feature extent (manual)
+
+# A long beach stored as one point can't show which end has what. This pulls the
+# real polyline so sections can be placed on evidence.
+
+on:
+  workflow_dispatch:
+    inputs:
+      features:
+        description: "Space-separated OSM ids, e.g. way/363019603"
+        required: true
+        default: "way/363019603"
+        type: string
+
+jobs:
+  extent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Fetch geometry
+        run: python -u scripts/osm_way_extent.py ${{ inputs.features }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: osm-extent
+          path: osm_extent.json
+          retention-days: 3
