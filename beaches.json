@@ -3,8 +3,8 @@
     "id": "ierissos",
     "name": "Ierissos Town Beach",
     "area": "Ierissos",
-    "lat": 40.3986,
-    "lon": 23.8792,
+    "lat": 40.39644,
+    "lon": 23.88727,
     "facing_deg": 90,
     "shelter_arc_deg": 140,
     "toddler_friendly": true,
@@ -12,7 +12,8 @@
     "has_beach_bar": true,
     "bar_notes": "Several cafes/tavernas along the beach road.",
     "crowd_level": "medium",
-    "notes": "The main town beach, faces the open Strymonic/Ierissos Gulf so it takes the full force of easterly winds. Coordinates verified against Wikipedia."
+    "notes": "The main town beach, faces the open Strymonic/Ierissos Gulf so it takes the full force of easterly winds. Position taken from the nearest OpenStreetMap-mapped beach; the description here is still hand-written.",
+    "coordinate_source": "matched to the OpenStreetMap beach “Πλαζ Ιερισσός”"
   },
   {
     "id": "nea_roda",
@@ -63,8 +64,8 @@
     "id": "ammouliani_alykes",
     "name": "Alykes Beach, Ammouliani",
     "area": "Ammouliani Island",
-    "lat": 40.325,
-    "lon": 23.91,
+    "lat": 40.3187,
+    "lon": 23.91594,
     "facing_deg": 260,
     "shelter_arc_deg": 110,
     "toddler_friendly": true,
@@ -72,7 +73,8 @@
     "has_beach_bar": true,
     "bar_notes": "Tavernas near the beach.",
     "crowd_level": "medium",
-    "notes": "On the western/southwestern coast of Ammouliani island, overlooking Sithonia. Requires the short ferry from Tripiti (~15 min crossing) plus driving. Position is estimated from the island's verified center coordinates (Wikipedia), not the exact beach - double-check on a map before relying on it for directions."
+    "notes": "On the western/southwestern coast of Ammouliani island, overlooking Sithonia. Requires the short ferry from Tripiti (~15 min crossing) plus driving. Position is estimated from the island's verified center coordinates (Wikipedia), not the exact beach - double-check on a map before relying on it for directions. Position taken from the nearest OpenStreetMap-mapped beach; the description here is still hand-written.",
+    "coordinate_source": "matched to the OpenStreetMap beach “Παραλία Αλυκές”"
   },
   {
     "id": "ammouliani_megali_ammos",
@@ -93,8 +95,8 @@
     "id": "pyrgadikia",
     "name": "Pyrgadikia Beach",
     "area": "Pyrgadikia",
-    "lat": 40.383,
-    "lon": 23.7,
+    "lat": 40.35084,
+    "lon": 23.73205,
     "facing_deg": 250,
     "shelter_arc_deg": 120,
     "toddler_friendly": true,
@@ -102,14 +104,15 @@
     "has_beach_bar": true,
     "bar_notes": "A couple of tavernas by the water.",
     "crowd_level": "low",
-    "notes": "On the Singitic Gulf coast (same side as Ouranoupoli/Ammouliani, not the Strymonic side like Ierissos), further southwest toward the base of Sithonia. Meaningfully further than Ouranoupoli/Ammouliani and possibly a longer, winding drive - confirm the route and travel time before heading out. Coordinates verified against Wikipedia."
+    "notes": "On the Singitic Gulf coast (same side as Ouranoupoli/Ammouliani, not the Strymonic side like Ierissos), further southwest toward the base of Sithonia. Meaningfully further than Ouranoupoli/Ammouliani and possibly a longer, winding drive - confirm the route and travel time before heading out. Position taken from the nearest OpenStreetMap-mapped beach; the description here is still hand-written.",
+    "coordinate_source": "matched to the OpenStreetMap beach “Παραλία Κάμπος (Πυργαδίκια)”"
   },
   {
     "id": "stratoni",
     "name": "Stratoni Beach",
     "area": "Stratoni",
-    "lat": 40.517,
-    "lon": 23.817,
+    "lat": 40.51181,
+    "lon": 23.82786,
     "facing_deg": 90,
     "shelter_arc_deg": 130,
     "toddler_friendly": true,
@@ -117,7 +120,8 @@
     "has_beach_bar": true,
     "bar_notes": "Beachfront cafes and restaurants.",
     "crowd_level": "low",
-    "notes": "North of Ierissos on the same Strymonic Gulf coast, so same wind exposure. Coordinates verified against Wikipedia."
+    "notes": "North of Ierissos on the same Strymonic Gulf coast, so same wind exposure. Position taken from the nearest OpenStreetMap-mapped beach; the description here is still hand-written.",
+    "coordinate_source": "matched to the OpenStreetMap beach “Παραλία Στρατώνι”"
   },
   {
     "id": "stavros",
@@ -153,8 +157,8 @@
     "id": "sarti",
     "name": "Sarti Beach",
     "area": "Sithonia",
-    "lat": 40.0981,
-    "lon": 23.9792,
+    "lat": 40.0882,
+    "lon": 23.98037,
     "facing_deg": 100,
     "shelter_arc_deg": 150,
     "toddler_friendly": true,
@@ -162,7 +166,8 @@
     "has_beach_bar": true,
     "bar_notes": "Lots of beach bars and restaurants along the promenade.",
     "crowd_level": "high",
-    "notes": "Open bay on Sithonia's east coast - only calm when wind isn't from the east. Coordinates verified against Wikipedia."
+    "notes": "Open bay on Sithonia's east coast - only calm when wind isn't from the east. Position taken from the nearest OpenStreetMap-mapped beach; the description here is still hand-written.",
+    "coordinate_source": "matched to the OpenStreetMap beach “Sarti Beach”"
   },
   {
     "id": "toroni",
@@ -183,8 +188,8 @@
     "id": "possidi",
     "name": "Possidi Beach",
     "area": "Kassandra",
-    "lat": 39.9582,
-    "lon": 23.3608,
+    "lat": 39.97088,
+    "lon": 23.3693,
     "facing_deg": 270,
     "shelter_arc_deg": 130,
     "toddler_friendly": true,
@@ -192,7 +197,8 @@
     "has_beach_bar": true,
     "bar_notes": "Beach cantina/bar near the lighthouse.",
     "crowd_level": "medium",
-    "notes": "On the Kassandra peninsula - a long drive from Ierissos, only realistic if you're already over there that day. Coordinates verified against Wikidata."
+    "notes": "On the Kassandra peninsula - a long drive from Ierissos, only realistic if you're already over there that day. Coordinates verified against Wikidata. Position taken from the nearest OpenStreetMap-mapped beach; the description here is still hand-written.",
+    "coordinate_source": "matched to the OpenStreetMap beach “Possidi Beach”"
   },
   {
     "id": "sani",
@@ -258,8 +264,8 @@
     "id": "chaniotis",
     "name": "Chaniotis Beach",
     "area": "Kassandra",
-    "lat": 40.0,
-    "lon": 23.567,
+    "lat": 40.00324,
+    "lon": 23.57313,
     "facing_deg": 90,
     "shelter_arc_deg": 130,
     "toddler_friendly": true,
@@ -267,7 +273,8 @@
     "has_beach_bar": true,
     "bar_notes": "Well-established resort town with many beach bars/tavernas along the front.",
     "crowd_level": "high",
-    "notes": "Northeastern coast of Kassandra, same busy resort strip as Polychrono/Pefkochori. Coordinates verified against Wikipedia."
+    "notes": "Northeastern coast of Kassandra, same busy resort strip as Polychrono/Pefkochori. Position taken from the nearest OpenStreetMap-mapped beach; the description here is still hand-written.",
+    "coordinate_source": "matched to the OpenStreetMap beach “παραλία Χανιώτη”"
   },
   {
     "id": "paliouri",
@@ -288,8 +295,8 @@
     "id": "nikiti",
     "name": "Nikiti Beach",
     "area": "Sithonia",
-    "lat": 40.20967,
-    "lon": 23.67383,
+    "lat": 40.21504,
+    "lon": 23.66709,
     "facing_deg": 250,
     "shelter_arc_deg": 130,
     "toddler_friendly": true,
@@ -297,7 +304,8 @@
     "has_beach_bar": true,
     "bar_notes": "Well-established resort town with many beach bars/tavernas along the front.",
     "crowd_level": "medium",
-    "notes": "West coast of Sithonia (Toroneos Gulf side, facing Kassandra). Coordinates verified against Wikipedia."
+    "notes": "West coast of Sithonia (Toroneos Gulf side, facing Kassandra). Position taken from the nearest OpenStreetMap-mapped beach; the description here is still hand-written.",
+    "coordinate_source": "matched to the OpenStreetMap beach “Παραλία Νικήτης”"
   },
   {
     "id": "neos_marmaras",
@@ -333,8 +341,8 @@
     "id": "kalamitsi",
     "name": "Kalamitsi Beach",
     "area": "Sithonia",
-    "lat": 39.9914,
-    "lon": 23.9906,
+    "lat": 39.99132,
+    "lon": 23.99657,
     "facing_deg": 120,
     "shelter_arc_deg": 130,
     "toddler_friendly": true,
@@ -342,7 +350,8 @@
     "has_beach_bar": true,
     "bar_notes": "Tavernas and beach bars near the coast.",
     "crowd_level": "medium",
-    "notes": "Southeastern coast of Sithonia. Coordinates verified against Wikidata."
+    "notes": "Southeastern coast of Sithonia. Coordinates verified against Wikidata. Position taken from the nearest OpenStreetMap-mapped beach; the description here is still hand-written.",
+    "coordinate_source": "matched to the OpenStreetMap beach “Παραλία Γυμνιστιών Καλαμίτσι”"
   },
   {
     "id": "paralia_katerinis",
@@ -454,8 +463,8 @@
     "id": "peraia",
     "name": "Peraia Beach",
     "area": "Thessaloniki",
-    "lat": 40.5,
-    "lon": 22.925,
+    "lat": 40.5115,
+    "lon": 22.93124,
     "facing_deg": 80,
     "shelter_arc_deg": 140,
     "toddler_friendly": true,
@@ -463,7 +472,8 @@
     "has_beach_bar": true,
     "bar_notes": "Busy beachfront promenade with many cafes/bars.",
     "crowd_level": "high",
-    "notes": "South shore of the Thermaikos Gulf, ~15km from Thessaloniki city centre - very popular with locals, especially on weekends. Coordinates verified against Wikipedia."
+    "notes": "South shore of the Thermaikos Gulf, ~15km from Thessaloniki city centre - very popular with locals, especially on weekends. Position taken from the nearest OpenStreetMap-mapped beach; the description here is still hand-written.",
+    "coordinate_source": "matched to the OpenStreetMap beach “Παραλία Περαίας”"
   },
   {
     "id": "agia_triada_thessaloniki",
@@ -679,8 +689,8 @@
     "id": "glyfada",
     "name": "Glyfada Beach",
     "area": "Athens Riviera (Attica)",
-    "lat": 37.867,
-    "lon": 23.75,
+    "lat": 37.86072,
+    "lon": 23.74762,
     "facing_deg": 210,
     "shelter_arc_deg": 130,
     "toddler_friendly": true,
@@ -688,7 +698,8 @@
     "has_beach_bar": true,
     "bar_notes": "Major Athens Riviera hub - abundant beach bars/clubs/restaurants.",
     "crowd_level": "high",
-    "notes": "Saronic Gulf coast just south of Athens, part of the busy Athens Riviera. Coordinates verified against Wikipedia."
+    "notes": "Saronic Gulf coast just south of Athens, part of the busy Athens Riviera. Position taken from the nearest OpenStreetMap-mapped beach; the description here is still hand-written.",
+    "coordinate_source": "matched to the OpenStreetMap beach “Παραλία Γλυφάδας Ακτή Δ”"
   },
   {
     "id": "vouliagmeni",
@@ -724,8 +735,8 @@
     "id": "loutraki",
     "name": "Loutraki Beach",
     "area": "Corinthia",
-    "lat": 37.983,
-    "lon": 22.983,
+    "lat": 37.97392,
+    "lon": 22.97533,
     "facing_deg": 0,
     "shelter_arc_deg": 110,
     "toddler_friendly": true,
@@ -733,7 +744,8 @@
     "has_beach_bar": true,
     "bar_notes": "Established spa/casino resort town with many cafes/bars.",
     "crowd_level": "high",
-    "notes": "On the Gulf of Corinth (enclosed gulf), a major spa and casino resort town near Corinth. Coordinates verified against Wikipedia."
+    "notes": "On the Gulf of Corinth (enclosed gulf), a major spa and casino resort town near Corinth. Position taken from the nearest OpenStreetMap-mapped beach; the description here is still hand-written.",
+    "coordinate_source": "matched to the OpenStreetMap beach “Loutraki blue flag beach”"
   },
   {
     "id": "kyllini",
@@ -754,8 +766,8 @@
     "id": "kalamata",
     "name": "Kalamata City Beach",
     "area": "Messinia",
-    "lat": 37.038,
-    "lon": 22.111,
+    "lat": 37.02415,
+    "lon": 22.11953,
     "facing_deg": 180,
     "shelter_arc_deg": 110,
     "toddler_friendly": true,
@@ -763,7 +775,8 @@
     "has_beach_bar": true,
     "bar_notes": "Major city with many beachfront cafes/bars.",
     "crowd_level": "medium",
-    "notes": "At the head of the Messinian Gulf (a large, partly enclosed gulf), the main city of the southwestern Peloponnese. Coordinates verified against Wikipedia."
+    "notes": "At the head of the Messinian Gulf (a large, partly enclosed gulf), the main city of the southwestern Peloponnese. Position taken from the nearest OpenStreetMap-mapped beach; the description here is still hand-written.",
+    "coordinate_source": "matched to the OpenStreetMap beach “Kalamata Beach”"
   },
   {
     "id": "voidokilia",
