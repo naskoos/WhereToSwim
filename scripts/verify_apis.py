@@ -201,6 +201,46 @@ if hist is not None:
         problems.append("sea history: sea_surface_temperature returned no values")
         results["sea_history"] = {"error": "no values"}
 
+# ------------------------------------------------------- road distance (OSRM)
+# Straight-line distance misleads badly on this coastline: Salonikiou is 20 km
+# across the Singitic Gulf but 39 km by road, because you drive around the bay.
+# OSRM's table service answers many destinations from one origin in a single
+# request, which is the only polite way to ask for 40 beaches at once.
+OSRM_URL = "https://router.project-osrm.org/table/v1/driving"
+HERE = (40.429569, 23.849819)          # the reporter's pin at Kakoudia
+ROAD_TARGETS = [
+    ("Salonikiou (Google says 39 km / 42 min)", 40.29298, 23.69503),
+    ("Develiki", 40.36266, 23.82645),
+    ("Ierissos town", 40.39860, 23.87920),
+    ("Nea Roda", 40.38060, 23.92500),
+]
+
+coords = ";".join(f"{lon},{lat}" for _, lat, lon in [("", HERE[0], HERE[1])] + ROAD_TARGETS)
+dests = ";".join(str(i) for i in range(1, len(ROAD_TARGETS) + 1))
+osrm_url = f"{OSRM_URL}/{coords}?sources=0&destinations={dests}&annotations=duration,distance"
+osrm, osrm_err = fetch("OSRM table — driving distance for several beaches at once", osrm_url)
+if osrm is not None and osrm.get("code") == "Ok":
+    durations = (osrm.get("durations") or [[]])[0]
+    distances = (osrm.get("distances") or [[]])[0]
+    print(f"  returned {len(distances)} distances for {len(ROAD_TARGETS)} destinations", flush=True)
+    road = {}
+    for (name, lat, lon), dist, dur in zip(ROAD_TARGETS, distances, durations):
+        straight = haversine_km(HERE[0], HERE[1], lat, lon)
+        if dist is None:
+            print(f"  {name}: no route found", flush=True)
+            continue
+        km, mins = dist / 1000, dur / 60
+        print(f"  {name}: straight {straight:.1f} km -> road {km:.1f} km, {mins:.0f} min "
+              f"(detour factor {km / straight:.2f}x)", flush=True)
+        road[name] = {"straight_km": round(straight, 1), "road_km": round(km, 1),
+                      "minutes": round(mins), "factor": round(km / straight, 2)}
+    results["road_distance"] = road
+    if not road:
+        problems.append("OSRM: no routes returned")
+elif osrm is not None:
+    problems.append(f"OSRM returned code={osrm.get('code')}")
+    print(f"  body: {json.dumps(osrm)[:300]}", flush=True)
+
 # -------------------------------------------------------------------- geocoder
 geo_url = f"{GEOCODE_URL}?name={urllib.parse.quote('Chania')}&count=6&language=en&format=json"
 geo, geo_err = fetch("geocoding API — place search", geo_url)
