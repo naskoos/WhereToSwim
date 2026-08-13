@@ -17,6 +17,7 @@ const OVERPASS_URLS = [
   "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
 ];
+const OSRM_TABLE_URL = "https://router.project-osrm.org/table/v1/driving";
 
 const OSM_DEDUPE_KM = 0.3;
 const OSM_AMENITY_RADIUS_KM = 0.4;
@@ -213,6 +214,7 @@ const state = {
   maxWave: null,           // null => derive from profile
   maxBft: null,
   results: [],
+  roadFilteredOut: 0,
   filters: new Set(),
   sort: "best",
   areaTimeline: null,
@@ -419,6 +421,41 @@ async function fetchConditions(beaches) {
   }
 
   return out;
+}
+
+/**
+ * Real driving distance and time to each candidate.
+ *
+ * Straight-line distance is badly misleading on this coastline: Salonikiou is
+ * 20 km across the Singitic Gulf and 36 km by road, because you drive around
+ * the bay. Measured detour factors here run from 1.3x to 1.8x, so no fixed
+ * multiplier would do — it has to be routed.
+ *
+ * OSRM's table service answers every destination from one origin in a single
+ * request, which keeps this to one call per search on a free public server.
+ */
+async function fetchRoadDistances(lat, lon, beaches) {
+  if (!beaches.length) return {};
+  const points = [[lon, lat], ...beaches.map((b) => [b.lon, b.lat])]
+    .map(([x, y]) => `${x},${y}`).join(";");
+  const dests = beaches.map((_, i) => i + 1).join(";");
+  const url = `${OSRM_TABLE_URL}/${points}?sources=0&destinations=${dests}&annotations=duration,distance`;
+
+  try {
+    const data = await getJSON(url, 15000);
+    if (!data || data.code !== "Ok") return {};
+    const distances = (data.distances || [[]])[0] || [];
+    const durations = (data.durations || [[]])[0] || [];
+    const out = {};
+    beaches.forEach((b, i) => {
+      if (distances[i] != null) {
+        out[b.id] = { km: distances[i] / 1000, minutes: (durations[i] ?? 0) / 60 };
+      }
+    });
+    return out;
+  } catch (e) {
+    return {};   // fall back to straight-line, labelled as such
+  }
 }
 
 /** Hourly wind for the searched area — powers the "calmest window today" card. */
@@ -782,7 +819,11 @@ function activeLimits() {
 
 function scoreBeach(beach, distanceKm, cond) {
   const lim = activeLimits();
-  const { windSpeed = null, windDir = null, windGust = null, waveHeight = null, seaTemp = null, uv = null, airTemp = null } = cond || {};
+  const { windSpeed = null, windDir = null, windGust = null, waveHeight = null,
+          seaTemp = null, uv = null, airTemp = null, road = null } = cond || {};
+
+  // Judge "how far" by the road when we know it — that's what you actually drive.
+  const travelKm = road ? road.km : distanceKm;
   const beaufort = kmhToBeaufort(windSpeed);
 
   let exposed = null;
@@ -821,7 +862,7 @@ function scoreBeach(beach, distanceKm, cond) {
 
   score -= beach.crowd_level ? (CROWD_PENALTY[beach.crowd_level] ?? 0) : CROWD_PENALTY_UNKNOWN;
   score -= Math.min(DISTANCE_PENALTY_AT_EDGE,
-                    (distanceKm / Math.max(1, state.radiusKm)) * DISTANCE_PENALTY_AT_EDGE);
+                    (travelKm / Math.max(1, state.radiusKm)) * DISTANCE_PENALTY_AT_EDGE);
   if (!passesComfort) score -= 40;
   if (state.favorites.has(beach.id)) score += 6;
 
@@ -833,6 +874,8 @@ function scoreBeach(beach, distanceKm, cond) {
     area: beach.area,
     lat: beach.lat, lon: beach.lon,
     distanceKm,
+    road,
+    travelKm,
     score,
     calmness,
     exposed,
@@ -1120,7 +1163,7 @@ function applyFiltersAndSort(list) {
 
   const cmp = {
     best: (a, b) => b.score - a.score,
-    near: (a, b) => a.distanceKm - b.distanceKm,
+    near: (a, b) => a.travelKm - b.travelKm,
     calm: (a, b) => b.calmness - a.calmness,
     warm: (a, b) => (b.seaTemp ?? -99) - (a.seaTemp ?? -99),
   }[state.sort];
@@ -1135,6 +1178,21 @@ function statTile(label, value, note, tone, extra) {
     <span class="s-value">${value == null ? "—" : value}${extra || ""}</span>
     ${note ? `<span class="s-note">${esc(note)}</span>` : ""}
   </div>`;
+}
+
+/**
+ * How far it is, said the way a driver means it. Falls back to straight-line
+ * when routing is unavailable, and says so rather than implying a road figure.
+ */
+function distanceText(r) {
+  if (r.road) {
+    const km = r.road.km < 10 ? r.road.km.toFixed(1) : Math.round(r.road.km);
+    const mins = Math.round(r.road.minutes);
+    const time = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins} min`;
+    return `${km} km · ${time} drive`;
+  }
+  const km = r.distanceKm < 10 ? r.distanceKm.toFixed(1) : Math.round(r.distanceKm);
+  return `${km} km in a straight line`;
 }
 
 function windArrow(deg) {
@@ -1175,7 +1233,7 @@ function beachCard(r, index) {
         ${r.latin ? `<div class="bc-latin">${esc(r.latin)}</div>` : ""}
         <div class="bc-place">
           <span>${esc(r.area)}</span><span class="dot">·</span>
-          <span class="num">${r.distanceKm < 10 ? r.distanceKm.toFixed(1) : Math.round(r.distanceKm)} km away</span>
+          <span class="num">${distanceText(r)}</span>
           ${r.source !== "curated" ? `<span class="dot">·</span><span title="Location and amenities from OpenStreetMap, not verified in person">OSM</span>` : ""}
         </div>
       </div>
@@ -1240,6 +1298,13 @@ function renderResults() {
     notices.push(`<div class="notice">${icon("info")}<div>No beach fell inside your radius, so these are the closest ones we know of.</div></div>`);
   }
 
+  if (state.roadFilteredOut) {
+    notices.push(`<div class="notice">${icon("info")}<div>
+      ${state.roadFilteredOut} nearby beach${state.roadFilteredOut === 1 ? " is" : "es are"} close in a straight line
+      but further than ${state.radiusKm} km <strong>by road</strong> — around here the coast road can double the
+      distance, so they're left out.</div></div>`);
+  }
+
   const hidden = countHiddenForMissingData(state.results);
   if (hidden) {
     notices.push(`<div class="notice">${icon("info")}<div>
@@ -1283,6 +1348,7 @@ function rescoreExisting() {
     const next = scoreBeach(r.beach, r.distanceKm, {
       windSpeed: r.windSpeed, windDir: r.windDir, windGust: r.windGust,
       waveHeight: r.waveHeight, seaTemp: r.seaTemp, uv: r.uv, airTemp: r.airTemp,
+      road: r.road,
     });
     next.isNearest = r.isNearest;
     return next;
@@ -1436,7 +1502,7 @@ async function openSheet(id) {
     <div class="sheet-head">
       <div style="flex:1;min-width:0">
         <h2 id="sheet-title">${esc(r.name)}</h2>
-        <div class="sh-sub">${r.latin ? esc(r.latin) + " · " : ""}${esc(r.area)} · ${r.distanceKm.toFixed(1)} km away</div>
+        <div class="sh-sub">${r.latin ? esc(r.latin) + " · " : ""}${esc(r.area)} · ${esc(distanceText(r))}</div>
       </div>
       <button class="icon-btn" type="button" id="sheet-close" aria-label="Close">${icon("close")}</button>
     </div>
@@ -1671,16 +1737,35 @@ async function runSearch() {
     }
 
     const beachList = candidates.map((c) => c.beach);
-    const [condById, timeline] = await Promise.all([
+    const [condById, timeline, roadById] = await Promise.all([
       fetchConditions(beachList),
       fetchAreaTimeline(lat, lon, true),
+      fetchRoadDistances(lat, lon, beachList),
     ]);
 
-    state.results = candidates.map((c) => scoreBeach(c.beach, c.distance, condById[c.beach.id]));
+    // Road distance is always >= straight-line, so the straight-line shortlist
+    // above is a superset of what's really within range: drop anything the
+    // road puts beyond the distance you said you'd travel.
+    const roadedOut = [];
+    candidates = candidates.filter((c) => {
+      const road = roadById[c.beach.id];
+      if (!road) return true;                       // unrouted: keep, don't punish
+      if (road.km <= state.radiusKm * 1.05) return true;
+      roadedOut.push(c);
+      return false;
+    });
+    if (!candidates.length) {                        // everything was too far by road
+      candidates = roadedOut.sort((a, b) => roadById[a.beach.id].km - roadById[b.beach.id].km).slice(0, 6);
+      state.usedFallbackRadius = true;
+    }
+    state.roadFilteredOut = roadedOut.length;
+
+    state.results = candidates.map((c) =>
+      scoreBeach(c.beach, c.distance, { ...condById[c.beach.id], road: roadById[c.beach.id] || null }));
     state.areaTimeline = analyseTimeline(timeline);
 
     const nearest = state.results.reduce(
-      (best, r) => (best == null || r.distanceKm < best.distanceKm ? r : best), null);
+      (best, r) => (best == null || r.travelKm < best.travelKm ? r : best), null);
     if (nearest) nearest.isNearest = true;
 
     const sample = state.results.find((r) => r.seaTemp != null) || state.results[0] || null;

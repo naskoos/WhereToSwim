@@ -18,6 +18,7 @@ swim is a good idea:
 | **UV index** | With shade/sunscreen advice — it gets extreme here in summer |
 | **Calmest window today** | An hourly wind timeline, so you can dodge the afternoon meltemi |
 | **Daylight left** | Time until sunset, for an evening swim |
+| **Driving distance** | Real road distance and time, not crow-flies — around the Chalkidiki peninsulas a beach 20 km across the water is a 40-minute drive around the bay |
 
 Each result leads with a one-line verdict — *"Very calm water · gentle sandy
 entry"*, *"Too windy right now — Bft 6 strong breeze"* — rather than making you
@@ -95,6 +96,10 @@ added by a maintainer.
   are badged **Hand-checked**; the rest come from OSM tags and are marked
   `OSM`.
 - **Place search** — Open-Meteo's geocoder.
+- **Driving distances** — the public [OSRM](https://project-osrm.org/) demo
+  server, one matrix request per search. It's a free service run on goodwill,
+  so if it's unavailable the app falls back to straight-line distance and
+  labels it plainly as such rather than passing it off as a drive.
 
 ## Honest limits
 
