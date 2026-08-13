@@ -1234,7 +1234,10 @@ function beachCard(r, index) {
         <div class="bc-place">
           <span>${esc(r.area)}</span><span class="dot">·</span>
           <span class="num">${distanceText(r)}</span>
-          ${r.source !== "curated" ? `<span class="dot">·</span><span title="Location and amenities from OpenStreetMap, not verified in person">OSM</span>` : ""}
+          ${r.source === "osm-unnamed"
+            ? `<span class="dot">·</span><span title="Mapped on OpenStreetMap but never named; the position is real, the label is the nearest settlement">unnamed on the map</span>`
+            : r.source !== "curated"
+            ? `<span class="dot">·</span><span title="Location and amenities from OpenStreetMap, not verified in person">OSM</span>` : ""}
         </div>
       </div>
       <button class="bc-fav ${fav ? "is-on" : ""}" type="button" data-fav="${esc(r.id)}"
