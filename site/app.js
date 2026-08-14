@@ -22,7 +22,7 @@ const OSRM_TABLE_URL = "https://router.project-osrm.org/table/v1/driving";
 const OSM_DEDUPE_KM = 0.3;
 const OSM_AMENITY_RADIUS_KM = 0.4;
 const OSM_MAX_RADIUS_KM = 40;
-const MAX_CANDIDATES_FOR_WEATHER = 40;
+const MAX_CANDIDATES_FOR_WEATHER = 60;
 const MIN_CURATED_BEFORE_SKIPPING_OSM = 8;
 const MAX_RESULTS_SHOWN = 25;
 
@@ -805,6 +805,37 @@ function shallowState(beach) {
   if (beach.toddler_friendly === true) return "yes";
   if (beach.toddler_friendly === false) return "no";
   return "unknown";
+}
+
+/**
+ * Choose which candidates get live conditions fetched for them.
+ *
+ * There's a cap because every candidate costs weather and routing lookups. But
+ * simply taking the nearest N makes the radius control useless: with 51 beaches
+ * inside 15 km, the nearest 40 were identical whether you asked for 15 km or
+ * 100 km, so widening the search changed nothing.
+ *
+ * Saying you'll travel 100 km means you want to see what's out there, and on
+ * this coast that matters — when the north wind blows out everything local, the
+ * calm water is round the far side of a peninsula. So keep a solid block of the
+ * nearest ones, then spread the remaining slots evenly across the rest of the
+ * range instead of clustering them all on your doorstep.
+ */
+function selectCandidates(sortedByDistance, cap) {
+  if (sortedByDistance.length <= cap) return sortedByDistance;
+
+  const nearCount = Math.floor(cap / 3);
+  const near = sortedByDistance.slice(0, nearCount);
+  const rest = sortedByDistance.slice(nearCount);
+  const wanted = cap - nearCount;
+
+  const step = rest.length / wanted;
+  const spread = [];
+  for (let i = 0; i < wanted; i++) {
+    const pick = rest[Math.min(rest.length - 1, Math.floor(i * step))];
+    if (pick) spread.push(pick);
+  }
+  return near.concat(spread);
 }
 
 function activeLimits() {
@@ -1725,7 +1756,7 @@ async function runSearch() {
         .sort((a, b) => a.distance - b.distance)
         .slice(0, 6);
     } else {
-      candidates = candidates.slice(0, MAX_CANDIDATES_FOR_WEATHER);
+      candidates = selectCandidates(candidates, MAX_CANDIDATES_FOR_WEATHER);
     }
 
     // Our own list now covers the whole country, so only fall back to a live
